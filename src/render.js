@@ -18,8 +18,9 @@ TERRAIN_RGB[FOREST]   = [44, 74, 44];
 TERRAIN_RGB[HILLS]    = [110, 92, 70];
 TERRAIN_RGB[MOUNTAIN] = [140, 140, 148];
 
-const FOOD_RGB = [150, 210, 80];
-const FOOD_MAX_ALPHA = 170;   // full food = fairly strong green, but terrain still shows through
+const GRAIN_RGB = [232, 196, 72];   // golden
+const FRUIT_RGB = [96, 200, 90];    // fresh green
+const FOOD_MAX_ALPHA = 170;         // full food = strong color, but terrain still shows through
 
 // A world-sized hidden canvas + its raw pixel memory.
 function makeLayer(world) {
@@ -56,27 +57,34 @@ export function createRenderer(canvas, world) {
     ctx.drawImage(layer.canvas, view.x, view.y, view.w, view.h);
   }
 
-  // Food: same green everywhere; only the transparency (alpha) changes with the amount.
-  // Empty cells are fully transparent, so overgrazed land shows its bare terrain color.
+  // Food: color = mix of gold (grain) and green (fruit), weighted by how much of each.
+  // Transparency (alpha) = how much food in total. Empty cells are fully transparent,
+  // so overgrazed land shows its bare terrain color.
   function paintFood(foodMax) {
-    const { food } = world;
+    const { grain, fruit } = world;
     const px = foodLayer.px;
-    for (let i = 0; i < food.length; i++) {
+    for (let i = 0; i < grain.length; i++) {
+      const g = grain[i] / foodMax;
+      const f = fruit[i] / foodMax;
+      const total = g + f;
       const p = i * 4;
-      px[p]     = FOOD_RGB[0];
-      px[p + 1] = FOOD_RGB[1];
-      px[p + 2] = FOOD_RGB[2];
-      px[p + 3] = (food[i] / foodMax) * FOOD_MAX_ALPHA;
+      if (total === 0) { px[p + 3] = 0; continue; }   // nothing here: fully see-through
+      const wg = g / total;                           // share of grain in the mix (0..1)
+      px[p]     = GRAIN_RGB[0] * wg + FRUIT_RGB[0] * (1 - wg);
+      px[p + 1] = GRAIN_RGB[1] * wg + FRUIT_RGB[1] * (1 - wg);
+      px[p + 2] = GRAIN_RGB[2] * wg + FRUIT_RGB[2] * (1 - wg);
+      px[p + 3] = Math.min(total, 1) * FOOD_MAX_ALPHA;
     }
     foodLayer.ctx.putImageData(foodLayer.image, 0, 0);
   }
 
   // Agents: one small square each. Same color for everyone, so we set fillStyle ONCE
-  // (changing it per agent is surprisingly slow). Tribe colors arrive in S3.
+  // (changing it per agent is surprisingly slow). Coral, so it stands out from gold and green.
+  // Tribe colors arrive in S3.
   function drawAgents(view, agents) {
     const inset = view.scale >= 4 ? 1 : 0;   // leave a 1px gap so crowded agents stay readable
     const size = view.scale - inset * 2;
-    ctx.fillStyle = '#ffd166';
+    ctx.fillStyle = '#ff6f59';
     for (const a of agents) {
       ctx.fillRect(view.x + a.x * view.scale + inset, view.y + a.y * view.scale + inset, size, size);
     }

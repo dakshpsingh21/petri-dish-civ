@@ -13,6 +13,7 @@ export const config = {
   // Feature flags: every mechanic can be switched off (debugging, perf cost, A/B experiments).
   features: {
     terrain: true,      // false = the whole map is plains (the S1 world)
+    twoResources: true, // false = grain only (agents don't need fruit)
   },
 
   // Terrain generation (becomes New World setup sliders in S8).
@@ -27,13 +28,15 @@ export const config = {
   },
 
   ticksPerSecond: 20,   // sim speed: world-steps per real second (independent of screen refresh rate)
-  foodMax: 10,          // most food one cell can hold
-  foodRegrowth: 0.02,   // food added to every cell per tick (0 -> full takes foodMax / this = 500 ticks)
+  foodMax: 10,          // most of ONE resource a cell can hold (terrain decides how much of that it gets)
+  // Regrowth = FRACTION OF A CELL'S OWN CAP regrown per tick (0.002 -> empty to full in 500 ticks).
+  // So fertile cells produce more per tick, and poor cells barely produce at all.
+  grainRegrowth: 0.002,
+  fruitRegrowth: 0.002,
 
   initialAgents: 2000,  // deliberately MORE than the world can feed, so we see a die-off
-  startEnergy: 20,      // energy each starting agent spawns with
-  maxEnergy: 40,        // an agent can't store more than this
-  biteSize: 2,          // most food an agent eats per tick
-  metabolism: 0.5,      // energy burned per tick just by being alive
-  // Rough carrying capacity = total regrowth / metabolism = (200*150*0.02) / 0.5 = 1200 agents
+  startStore: 10,       // grain AND fruit each agent spawns with
+  maxStore: 20,         // most of EACH resource an agent can carry
+  biteSize: 2,          // most of EACH resource an agent eats per tick
+  metabolism: 0.25,     // amount of EACH resource burned per tick (total 0.5, same as S1)
 };

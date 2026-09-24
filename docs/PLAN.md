@@ -26,7 +26,7 @@
 ## S2: A world with shape 🗺️
 **Goal:** terrain, two resources and seasons, so geography starts deciding where life does well.
 - [x] 1. `noise.js`: seeded 2D **value noise** + octaves (smoothstep interpolation, no `Math.sin`). Start `tests.html`: same seed → same map.
-- [ ] 2. Terrain from elevation: water / plains / forest / hills / mountain. Water + mountain can't be crossed. Terrain gets drawn once to a cached canvas.
+- [x] 2. Terrain from elevation: water / plains / forest / hills / mountain. Water + mountain can't be crossed. Terrain gets drawn once to a cached canvas.
 - [ ] 3. Two resources: **grain** (dry lowlands) and **fruit** (wet forest), with per-cell caps from terrain. Agents carry both, head for the one they lack most, and die if either hits 0.
 - [ ] 4. Seasons: a triangle-wave regrowth multiplier per resource with a phase offset (grain peaks in summer, fruit in autumn). Show the season in the overlay.
 - [ ] 5. Fading **trails** layer (render only, doesn't affect the sim).

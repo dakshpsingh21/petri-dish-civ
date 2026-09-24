@@ -4,7 +4,7 @@
 
 import { createRng, hashString } from './rng.js';
 import { createWorld, regrow, isPassable } from './world.js';
-import { createAgent, moveTowardFood, eat, burnEnergy } from './agent.js';
+import { createAgent, moveTowardFood, eat, metabolize } from './agent.js';
 
 // Build a brand-new world from config. Reset = call this again.
 export function createSim(config, width, height) {
@@ -21,7 +21,7 @@ export function createSim(config, width, height) {
       y = rng.int(height);
     } while (!isPassable(world, x, y) && ++tries < 1000);
     if (!isPassable(world, x, y)) break;   // no land found: stop spawning
-    state.agents.push(createAgent(state.nextAgentId++, x, y, config.startEnergy));
+    state.agents.push(createAgent(state.nextAgentId++, x, y, config.startStore));
   }
   return state;
 }
@@ -30,7 +30,7 @@ export function createSim(config, width, height) {
 // change it and you change history (and the RNG sequence).
 export function step(state, config) {
   // 1. Food grows back.
-  regrow(state.world, config.foodRegrowth);
+  regrow(state.world, config.grainRegrowth, config.fruitRegrowth);
 
   // 2. Shuffle who goes first. Without this, agent #0 would ALWAYS get first pick
   //    of the food, a hidden unfair advantage baked into the array order.
@@ -39,9 +39,9 @@ export function step(state, config) {
   // 3. Each agent lives one tick.
   for (const agent of state.agents) {
     agent.age++;
-    moveTowardFood(agent, state.world, state.rng);
+    moveTowardFood(agent, state.world, state.rng, config);
     eat(agent, state.world, config);
-    burnEnergy(agent, config);
+    metabolize(agent, config);
   }
 
   // 4. Clear out the dead.

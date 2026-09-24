@@ -1,4 +1,7 @@
-// world.js: the grid of cells: terrain + food. Pure sim code: no DOM, no Math.random().
+// world.js: the grid of cells: terrain + two resources. Pure sim code: no DOM, no Math.random().
+//
+// Two resources, grain and fruit, grow in DIFFERENT places. Agents need both, so they must
+// travel between plains and forest, and (from S4) trade. The borders between the two become prime land.
 //
 // Every per-cell property is ONE flat typed array. Cell (x, y) lives at index
 // i = y * width + x (row by row, like reading a page). Compact and fast to loop over.
@@ -11,7 +14,11 @@ export const TERRAIN_NAMES = ['water', 'plains', 'forest', 'hills', 'mountain'];
 
 // Lookup tables indexed by terrain type: faster and clearer than a chain of ifs.
 export const PASSABLE = [false, true, true, true, false];   // can agents stand here?
-const FOOD_CAP_FRACTION = [0, 1, 1, 0.4, 0];               // share of foodMax this terrain can hold
+
+// Share of foodMax each terrain can hold, per resource.   water plains forest hills mountain
+const GRAIN_CAP = [0, 1.0, 0.15, 0.3, 0];   // grain loves dry open plains
+const FRUIT_CAP = [0, 0.15, 1.0, 0.3, 0];   // fruit loves wet forest
+const SINGLE_CAP = [0, 1.0, 1.0, 0.4, 0];   // twoResources OFF: grain grows like S1's food
 
 export function createWorld(width, height, rng, config) {
   const n = width * height;
@@ -20,8 +27,10 @@ export function createWorld(width, height, rng, config) {
     elevation: new Float32Array(n),   // 0..1, kept for shading + regions later
     moisture: new Float32Array(n),    // 0..1
     terrain: new Uint8Array(n),       // WATER..MOUNTAIN
-    foodCap: new Float32Array(n),     // most food this cell can ever hold
-    food: new Float32Array(n),        // food right now
+    grainCap: new Float32Array(n),    // most grain this cell can ever hold
+    fruitCap: new Float32Array(n),
+    grain: new Float32Array(n),       // grain right now
+    fruit: new Float32Array(n),
   };
 
   if (config.features.terrain) {
@@ -35,9 +44,13 @@ export function createWorld(width, height, rng, config) {
     world.elevation.fill(0.5);
   }
 
+  const two = config.features.twoResources;
   for (let i = 0; i < n; i++) {
-    world.foodCap[i] = FOOD_CAP_FRACTION[world.terrain[i]] * config.foodMax;
-    world.food[i] = rng.next() * world.foodCap[i];   // seeded random starting amount
+    const t = world.terrain[i];
+    world.grainCap[i] = (two ? GRAIN_CAP[t] : SINGLE_CAP[t]) * config.foodMax;
+    world.fruitCap[i] = (two ? FRUIT_CAP[t] : 0) * config.foodMax;
+    world.grain[i] = rng.next() * world.grainCap[i];   // seeded random starting amounts
+    world.fruit[i] = rng.next() * world.fruitCap[i];
   }
   return world;
 }
@@ -70,11 +83,18 @@ export function isPassable(world, x, y) {
   return PASSABLE[world.terrain[y * world.width + x]];
 }
 
-// Every cell grows back a little each tick, capped by what its terrain can hold.
-export function regrow(world, rate) {
-  const { food, foodCap } = world;
-  for (let i = 0; i < food.length; i++) {
-    const grown = food[i] + rate;
-    food[i] = grown > foodCap[i] ? foodCap[i] : grown;
+// Every cell grows back a FRACTION OF ITS OWN CAP each tick.
+// Why not a flat amount? With a flat +0.02, a forest cell (small grain cap) would still
+// PRODUCE grain as fast as a plains cell whenever someone kept eating it: the cap only
+// limited storage, not production. Scaling by the cap makes fertile land truly more productive.
+export function regrow(world, grainRate, fruitRate) {
+  growTowardCap(world.grain, world.grainCap, grainRate);
+  growTowardCap(world.fruit, world.fruitCap, fruitRate);
+}
+
+function growTowardCap(amount, cap, rate) {
+  for (let i = 0; i < amount.length; i++) {
+    const grown = amount[i] + cap[i] * rate;
+    amount[i] = grown > cap[i] ? cap[i] : grown;
   }
 }

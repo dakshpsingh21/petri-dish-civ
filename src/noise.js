@@ -65,7 +65,7 @@ export function fractalNoise(x, y, seed, octaves = 4, persistence = 0.5) {
 }
 
 // Convenience: a whole width x height map, one value per cell, in a flat Float32Array
-// (same layout as world.food: index = y * width + x).
+// (same layout as world.grain: index = y * width + x).
 // scale = size of the biggest features in cells (bigger = broader continents).
 export function noiseMap(width, height, seed, { scale = 40, octaves = 4, persistence = 0.5 } = {}) {
   const map = new Float32Array(width * height);

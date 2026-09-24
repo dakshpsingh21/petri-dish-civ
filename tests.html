@@ -70,7 +70,7 @@
       const run = () => {
         const s = createSim(config, WORLD_WIDTH, WORLD_HEIGHT);
         for (let t = 0; t < 300; t++) step(s, config);
-        return s.agents.map(a => `${a.id},${a.x},${a.y},${a.energy}`).join('|');
+        return s.agents.map(a => `${a.id},${a.x},${a.y},${a.grain},${a.fruit}`).join('|');
       };
       assert(run() === run(), 'runs diverged');
     });
