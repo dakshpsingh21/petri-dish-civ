@@ -17,7 +17,7 @@
 - [x] 2. `config.js` + `rng.js` (mulberry32) + fixed-timestep loop in `main.js` with an FPS / tick counter overlay.
 - [x] 3. `world.js` (one food `Float32Array` for now + regrowth) + `render.js` (food layer via ImageData).
 - [x] 4. `agent.js` + `sim.js`: spawn N agents; each tick move toward the best neighboring food (seeded tie-break), eat, pay metabolism, die at 0. Draw agents.
-- [ ] 5. Push to GitHub + enable GitHub Pages → first live link.
+- [x] 5. Push to GitHub + enable GitHub Pages → first live link.
 
 **Files:** `index.html`, `style.css`, `src/main.js`, `config.js`, `rng.js`, `world.js`, `agent.js`, `sim.js`, `render.js` (all small)
 **Done when:** agents chase food and die when it runs out · same seed → identical run · live on GitHub Pages.

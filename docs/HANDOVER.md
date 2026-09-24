@@ -6,22 +6,22 @@
 _Last updated: 2026-09-24 · S1 chat (mode A: AI writes, Daksh reviews)_
 
 ## Last completed step
-**S1 step 4** (agents seek food, eat, starve, die). S1 step 5 (GitHub + Pages) handed to Daksh to do himself.
+**S1 complete ✅** (step 5: pushed to GitHub, Pages enabled). Session S1 closed.
 
 ## Current state
-- Repo: `C:\Users\Daksh\Documents\petri-dish-civ` (branch `master`, to be renamed `main` in step 5). Docs in `/docs` are the source of truth.
+- Repo: `C:\Users\Daksh\Documents\petri-dish-civ` (branch `main`, remote `origin` = https://github.com/dakshpsingh21/petri-dish-civ). Docs in `/docs` are the source of truth.
 - Works: full-window canvas, seeded RNG (mulberry32 + FNV-1a string hash + Fisher-Yates shuffle), fixed-timestep loop (20 TPS, clamp 250 ms, max 10 steps/frame), 200x150 food grid (Float32Array, linear regrowth) drawn via offscreen canvas + ImageData, 2,000 agents that move to the best of 9 cells (seeded reservoir-sampling tie-break), eat, burn energy, die. Overlay: FPS / TPS / tick / alive / seed.
 - Behavior with seed "petri": die-off 2000 -> 888 between ticks 250-500, then stable (no reproduction yet). Deterministic (verified headless in Node). ~0.2 ms/tick at 2k agents.
 - Shuffle check (headless, 1000 ticks): with shuffle mean survivor id 998 (fair); without shuffle mean id 804 (63% from first-created half) -> order bias is real but invisible on screen.
 - How to run: `python -m http.server 8000` in repo root -> http://localhost:8000
 - Headless test pattern: `node --input-type=module -e "import('./src/sim.js')..."` (sim.js has no DOM, so Node can run it).
-- Live link: pending (S1 step 5).
+- Live link: https://dakshpsingh21.github.io/petri-dish-civ/ (Pages deploys from `main` / root automatically on every push; takes 1-2 min).
 
 ## Next step
-1. **If not done: S1 step 5.** Daksh creates public GitHub repo `petri-dish-civ` (no README), `git branch -M main`, `git remote add origin ...`, `git push -u origin main`, then Settings -> Pages -> Deploy from branch `main` / root. Confirm the live URL loads, tick step 5, put the URL in this file.
-2. **Then S2 step 1:** `noise.js` (seeded 2D value noise + octaves, smoothstep, no Math.sin) + start `tests.html`. Ask mode A/B first.
+**Start S2 in a NEW chat.** S2 step 1: `noise.js` (seeded 2D value noise + octaves, smoothstep, no Math.sin) + start `tests.html`. Ask mode A/B first.
 
 ## Known bugs / open questions
+- GitHub auth: password auth fails; use Git Credential Manager browser login (or a fine-grained PAT, never pasted in chat or in the remote URL).
 - A stale `.git/index.lock` was created when the AI ran `git status` from its shell. Daksh deletes it with `Remove-Item .git\index.lock` if git complains. Rule added to AI_RULES: AI never runs git.
 - Population never grows (no reproduction until S3), so after the die-off the screen is calm. Expected.
 - `config.seed` is hard-coded ('petri'); URL seeds come in S8.
