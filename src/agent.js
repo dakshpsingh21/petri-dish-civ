@@ -1,6 +1,6 @@
 // agent.js: what ONE agent is and what it does. Pure sim code: no DOM, no Math.random().
 
-import { cellIndex } from './world.js';
+import { cellIndex, isPassable } from './world.js';
 
 // Plain object for now: easy to read and inspect in the console.
 // (Traits, tribe, memory arrive in S3-S5. Typed arrays only if profiling says so.)
@@ -22,6 +22,7 @@ export function moveTowardFood(agent, world, rng) {
       const x = agent.x + dx;
       const y = agent.y + dy;
       if (x < 0 || y < 0 || x >= world.width || y >= world.height) continue; // world edge = wall
+      if (!isPassable(world, x, y)) continue;                                 // water / mountain = wall
 
       const food = world.food[cellIndex(world, x, y)];
       if (food > bestFood) {

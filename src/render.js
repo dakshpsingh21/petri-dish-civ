@@ -1,24 +1,44 @@
 // render.js: draws the sim onto the canvas. READS state, never changes it.
 //
-// Food trick: we paint 1 pixel per cell into a small hidden ("offscreen") canvas,
-// then stretch that onto the real canvas in ONE drawImage call. Much cheaper than
-// 30,000 separate fillRect calls.
+// Layers, bottom to top:
+//   1. terrain: painted ONCE into a hidden canvas (terrain never changes), reused every frame
+//   2. food:    repainted every frame as semi-transparent green on top of the terrain
+//   3. agents, then the debug overlay
+// Each layer is 1 pixel per cell, stretched onto the screen with ONE drawImage call.
+
+import { WATER, PLAINS, FOREST, HILLS, MOUNTAIN } from './world.js';
 
 const BG = '#10141c';
 
+// Base color per terrain type [R, G, B], indexed by the terrain number.
+const TERRAIN_RGB = [];
+TERRAIN_RGB[WATER]    = [28, 60, 96];
+TERRAIN_RGB[PLAINS]   = [120, 110, 62];
+TERRAIN_RGB[FOREST]   = [44, 74, 44];
+TERRAIN_RGB[HILLS]    = [110, 92, 70];
+TERRAIN_RGB[MOUNTAIN] = [140, 140, 148];
+
+const FOOD_RGB = [150, 210, 80];
+const FOOD_MAX_ALPHA = 170;   // full food = fairly strong green, but terrain still shows through
+
+// A world-sized hidden canvas + its raw pixel memory.
+function makeLayer(world) {
+  const canvas = document.createElement('canvas');   // never added to the page
+  canvas.width = world.width;
+  canvas.height = world.height;
+  const ctx = canvas.getContext('2d');
+  // ImageData.data = Uint8ClampedArray, 4 bytes per pixel (R, G, B, A).
+  // "Clamped": values auto-round and stay in 0..255, so a too-bright shade can't overflow.
+  const image = ctx.createImageData(world.width, world.height);
+  return { canvas, ctx, image, px: image.data };
+}
+
 export function createRenderer(canvas, world) {
   const ctx = canvas.getContext('2d');
+  const terrainLayer = makeLayer(world);
+  const foodLayer = makeLayer(world);
 
-  // Offscreen canvas: exactly world.width x world.height pixels. Never added to the page.
-  const layer = document.createElement('canvas');
-  layer.width = world.width;
-  layer.height = world.height;
-  const layerCtx = layer.getContext('2d');
-
-  // ImageData = raw pixel memory. data is a Uint8ClampedArray: 4 bytes per pixel (R, G, B, A).
-  // "Clamped" means values auto-round and stay within 0..255, so we can't overflow a color.
-  const image = layerCtx.createImageData(world.width, world.height);
-  const px = image.data;
+  paintTerrain(terrainLayer, world);   // once, up front
 
   // Biggest WHOLE-number zoom that fits the window, centered.
   // Whole numbers keep every cell the same size (no blurry or uneven pixels).
@@ -29,22 +49,26 @@ export function createRenderer(canvas, world) {
     return { scale, x: Math.floor((canvas.width - w) / 2), y: Math.floor((canvas.height - h) / 2), w, h };
   }
 
-  function drawFood(view, foodMax) {
-    const food = world.food;
-    for (let i = 0; i < food.length; i++) {
-      const t = food[i] / foodMax;   // 0 = empty, 1 = full
-      const p = i * 4;               // where this cell's 4 bytes start
-      px[p]     = 22 + t * 40;       // R
-      px[p + 1] = 26 + t * 150;      // G: more food = greener
-      px[p + 2] = 34 + t * 30;       // B
-      px[p + 3] = 255;               // A: fully opaque
-    }
-    layerCtx.putImageData(image, 0, 0);
-
-    // Resizing a canvas resets this setting, so we set it every frame (it's cheap).
+  function drawLayer(layer, view) {
+    // Resizing a canvas resets this setting, so we set it every time (it's cheap).
     // false = scale up with hard pixel edges instead of blurring them.
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(layer, view.x, view.y, view.w, view.h);
+    ctx.drawImage(layer.canvas, view.x, view.y, view.w, view.h);
+  }
+
+  // Food: same green everywhere; only the transparency (alpha) changes with the amount.
+  // Empty cells are fully transparent, so overgrazed land shows its bare terrain color.
+  function paintFood(foodMax) {
+    const { food } = world;
+    const px = foodLayer.px;
+    for (let i = 0; i < food.length; i++) {
+      const p = i * 4;
+      px[p]     = FOOD_RGB[0];
+      px[p + 1] = FOOD_RGB[1];
+      px[p + 2] = FOOD_RGB[2];
+      px[p + 3] = (food[i] / foodMax) * FOOD_MAX_ALPHA;
+    }
+    foodLayer.ctx.putImageData(foodLayer.image, 0, 0);
   }
 
   // Agents: one small square each. Same color for everyone, so we set fillStyle ONCE
@@ -66,15 +90,34 @@ export function createRenderer(canvas, world) {
     lines.forEach((text, i) => ctx.fillText(text, 12, 24 + i * 18));
   }
 
-  // One full frame: background, world, then debug text on top.
+  // One full frame.
   function render(state, config, overlayLines) {
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     const view = fitView();
-    drawFood(view, config.foodMax);
+    drawLayer(terrainLayer, view);
+    paintFood(config.foodMax);
+    drawLayer(foodLayer, view);   // drawImage respects alpha, so terrain shows through
     drawAgents(view, state.agents);
     drawOverlay(overlayLines);
   }
 
   return { render };
+}
+
+// Terrain color, shaded by elevation: low = darker, high = lighter.
+// That one multiply gives deep lakes, and bright snowy-looking peaks, for free.
+function paintTerrain(layer, world) {
+  const { terrain, elevation } = world;
+  const px = layer.px;
+  for (let i = 0; i < terrain.length; i++) {
+    const rgb = TERRAIN_RGB[terrain[i]];
+    const shade = 0.55 + 0.9 * elevation[i];   // ~0.55 (deepest water) .. ~1.45 (highest peak)
+    const p = i * 4;
+    px[p]     = rgb[0] * shade;
+    px[p + 1] = rgb[1] * shade;
+    px[p + 2] = rgb[2] * shade;
+    px[p + 3] = 255;
+  }
+  layer.ctx.putImageData(layer.image, 0, 0);
 }

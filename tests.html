@@ -22,6 +22,7 @@
     import { noiseMap } from './src/noise.js';
     import { createSim, step } from './src/sim.js';
     import { config, WORLD_WIDTH, WORLD_HEIGHT } from './src/config.js';
+    import { PASSABLE } from './src/world.js';
 
     const list = document.getElementById('results');
     function test(name, fn) {
@@ -72,6 +73,22 @@
         return s.agents.map(a => `${a.id},${a.x},${a.y},${a.energy}`).join('|');
       };
       assert(run() === run(), 'runs diverged');
+    });
+
+    // ---------- world.js terrain ----------
+    test('terrain: same seed -> identical terrain', () => {
+      const t1 = createSim(config, WORLD_WIDTH, WORLD_HEIGHT).world.terrain;
+      const t2 = createSim(config, WORLD_WIDTH, WORLD_HEIGHT).world.terrain;
+      assert(sameArray(t1, t2), 'terrain differs');
+    });
+    test('terrain: no agent ever stands on water or mountain (500 ticks)', () => {
+      const s = createSim(config, WORLD_WIDTH, WORLD_HEIGHT);
+      for (let t = 0; t < 500; t++) {
+        step(s, config);
+        for (const a of s.agents) {
+          assert(PASSABLE[s.world.terrain[a.y * WORLD_WIDTH + a.x]], `agent ${a.id} on impassable cell at tick ${t}`);
+        }
+      }
     });
 
     // ---------- visual check: draw a noise map in grayscale ----------

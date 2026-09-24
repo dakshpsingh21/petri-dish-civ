@@ -3,18 +3,24 @@
 // and why the same seed always gives the same history.
 
 import { createRng, hashString } from './rng.js';
-import { createWorld, regrow } from './world.js';
+import { createWorld, regrow, isPassable } from './world.js';
 import { createAgent, moveTowardFood, eat, burnEnergy } from './agent.js';
 
 // Build a brand-new world from config. Reset = call this again.
 export function createSim(config, width, height) {
   const rng = createRng(hashString(config.seed));
-  const world = createWorld(width, height, rng, config.foodMax);
+  const world = createWorld(width, height, rng, config);
   const state = { tick: 0, rng, world, agents: [], nextAgentId: 1 };
 
   for (let n = 0; n < config.initialAgents; n++) {
-    const x = rng.int(width);
-    const y = rng.int(height);
+    // Re-roll until we land on walkable ground (no spawning in lakes or on peaks).
+    // The attempt cap stops an endless loop on a map that is ALL water/mountain.
+    let x, y, tries = 0;
+    do {
+      x = rng.int(width);
+      y = rng.int(height);
+    } while (!isPassable(world, x, y) && ++tries < 1000);
+    if (!isPassable(world, x, y)) break;   // no land found: stop spawning
     state.agents.push(createAgent(state.nextAgentId++, x, y, config.startEnergy));
   }
   return state;
@@ -24,7 +30,7 @@ export function createSim(config, width, height) {
 // change it and you change history (and the RNG sequence).
 export function step(state, config) {
   // 1. Food grows back.
-  regrow(state.world, config.foodRegrowth, config.foodMax);
+  regrow(state.world, config.foodRegrowth);
 
   // 2. Shuffle who goes first. Without this, agent #0 would ALWAYS get first pick
   //    of the food, a hidden unfair advantage baked into the array order.

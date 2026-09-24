@@ -9,6 +9,23 @@ export const WORLD_HEIGHT = 150;
 
 export const config = {
   seed: 'daksh',        // any string; rng.js hashes it into a 32-bit number
+
+  // Feature flags: every mechanic can be switched off (debugging, perf cost, A/B experiments).
+  features: {
+    terrain: true,      // false = the whole map is plains (the S1 world)
+  },
+
+  // Terrain generation (becomes New World setup sliders in S8).
+  // Elevation and moisture are noise maps stretched to 0..1.
+  terrain: {
+    elevationScale: 50,   // size of the biggest landforms, in cells
+    moistureScale: 35,
+    waterLevel: 0.35,     // elevation below this = water
+    hillLevel: 0.70,      // above this = hills
+    mountainLevel: 0.85,  // above this = mountains
+    forestMoisture: 0.55, // lowland wetter than this = forest, else plains
+  },
+
   ticksPerSecond: 20,   // sim speed: world-steps per real second (independent of screen refresh rate)
   foodMax: 10,          // most food one cell can hold
   foodRegrowth: 0.02,   // food added to every cell per tick (0 -> full takes foodMax / this = 500 ticks)
