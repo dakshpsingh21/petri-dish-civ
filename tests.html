@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Petri Dish Civilization: tests</title>
+  <style>
+    body { background: #10141c; color: #cfd8e3; font: 14px monospace; padding: 16px; }
+    .pass { color: #7fd1b9; }
+    .fail { color: #ff6b6b; }
+    canvas { image-rendering: pixelated; width: 400px; height: 300px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h2>Tests</h2>
+  <ul id="results"></ul>
+  <div>Noise preview (seed 12345). Should look like soft clouds, not TV static:</div>
+  <canvas id="preview" width="200" height="150"></canvas>
+
+  <!-- Zero-dependency test runner: each test is a function that throws if something is wrong. -->
+  <script type="module">
+    import { createRng, hashString } from './src/rng.js';
+    import { noiseMap } from './src/noise.js';
+    import { createSim, step } from './src/sim.js';
+    import { config, WORLD_WIDTH, WORLD_HEIGHT } from './src/config.js';
+
+    const list = document.getElementById('results');
+    function test(name, fn) {
+      let ok = true, msg = '';
+      try { fn(); } catch (e) { ok = false; msg = ' -> ' + e.message; }
+      const li = document.createElement('li');
+      li.className = ok ? 'pass' : 'fail';
+      li.textContent = (ok ? 'PASS ' : 'FAIL ') + name + msg;
+      list.appendChild(li);
+    }
+    function assert(cond, msg) { if (!cond) throw new Error(msg); }
+    const sameArray = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+    // ---------- rng.js ----------
+    test('rng: same seed -> same sequence', () => {
+      const a = createRng(42), b = createRng(42);
+      for (let i = 0; i < 1000; i++) assert(a.next() === b.next(), 'diverged at ' + i);
+    });
+    test('rng: "petri" first roll is 0.932482 (value locked in S1)', () => {
+      assert(createRng(hashString('petri')).next().toFixed(6) === '0.932482', 'changed!');
+    });
+
+    // ---------- noise.js ----------
+    const W = 200, H = 150;
+    test('noise: same seed -> identical map', () => {
+      assert(sameArray(noiseMap(W, H, 7), noiseMap(W, H, 7)), 'maps differ');
+    });
+    test('noise: different seed -> different map', () => {
+      assert(!sameArray(noiseMap(W, H, 7), noiseMap(W, H, 8)), 'maps identical');
+    });
+    test('noise: values stay in [0, 1)', () => {
+      const m = noiseMap(W, H, 99);
+      assert(m.every(v => v >= 0 && v < 1), 'out of range');
+    });
+    test('noise: smooth (neighbouring cells differ by < 0.1)', () => {
+      const m = noiseMap(W, H, 99);
+      for (let i = 1; i < m.length; i++) {
+        if (i % W === 0) continue;              // skip jumps from end of one row to start of next
+        assert(Math.abs(m[i] - m[i - 1]) < 0.1, 'jump at index ' + i);
+      }
+    });
+
+    // ---------- sim.js ----------
+    test('sim: same seed, 300 ticks -> identical agents', () => {
+      const run = () => {
+        const s = createSim(config, WORLD_WIDTH, WORLD_HEIGHT);
+        for (let t = 0; t < 300; t++) step(s, config);
+        return s.agents.map(a => `${a.id},${a.x},${a.y},${a.energy}`).join('|');
+      };
+      assert(run() === run(), 'runs diverged');
+    });
+
+    // ---------- visual check: draw a noise map in grayscale ----------
+    const ctx = document.getElementById('preview').getContext('2d');
+    const img = ctx.createImageData(W, H);
+    const map = noiseMap(W, H, 12345);
+    for (let i = 0; i < map.length; i++) {
+      const v = map[i] * 255;
+      img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+      img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  </script>
+</body>
+</html>
