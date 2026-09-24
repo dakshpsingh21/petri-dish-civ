@@ -16,7 +16,7 @@
 - [x] 1. Skeleton: repo folder + `git init`, `index.html`, `style.css`, `src/main.js`. Serve locally (`python -m http.server 8000`) and see a colored canvas. *(ES modules don't load from `file://`.)*
 - [x] 2. `config.js` + `rng.js` (mulberry32) + fixed-timestep loop in `main.js` with an FPS / tick counter overlay.
 - [x] 3. `world.js` (one food `Float32Array` for now + regrowth) + `render.js` (food layer via ImageData).
-- [ ] 4. `agent.js` + `sim.js`: spawn N agents; each tick move toward the best neighboring food (seeded tie-break), eat, pay metabolism, die at 0. Draw agents.
+- [x] 4. `agent.js` + `sim.js`: spawn N agents; each tick move toward the best neighboring food (seeded tie-break), eat, pay metabolism, die at 0. Draw agents.
 - [ ] 5. Push to GitHub + enable GitHub Pages → first live link.
 
 **Files:** `index.html`, `style.css`, `src/main.js`, `config.js`, `rng.js`, `world.js`, `agent.js`, `sim.js`, `render.js` (all small)
