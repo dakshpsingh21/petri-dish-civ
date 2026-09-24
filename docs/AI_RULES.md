@@ -54,6 +54,7 @@ In mode B, use a **hint ladder** and only climb when he's stuck or asks:
 - **Every new mechanic gets a feature flag + its knobs in `config.js`**, and shows up in the UI (live controls, and the setup screen where it makes sense). Add mechanics one at a time and tune each before starting the next.
 - `fx.js` and rendering must never call the RNG (so visuals can't change history).
 - No allocations inside per-agent hot loops once we reach S12 (and avoid them earlier when it's free).
+- **Never run `git` from the AI's shell** (it can't delete files there and leaves a stale `.git/index.lock`). Daksh runs all git commands himself.
 - Follow ARCHITECTURE.md. If something needs to change, discuss it and record the decision in HANDOVER.md.
 
 ## 8. Bookkeeping (mandatory)
