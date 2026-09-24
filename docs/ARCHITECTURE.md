@@ -90,8 +90,9 @@ world = {
 ```
 - **Terrain** comes from two noise maps: *elevation* → water / lowland / hills / mountain,
   *moisture* → dry (grain) vs wet (fruit). Water + mountain can't be crossed.
-- **Seasons:** `seasonFactor(tick, phase)` is a **triangle wave** (plain arithmetic, no `Math.sin`).
-  Grain and fruit peak at different times of year, so trade demand changes with the seasons.
+- **Regrowth** = a fraction of the cell's own cap per tick (`grain += grainCap * rate * seasonFactor`), so fertile cells produce more, not just store more.
+- **Seasons:** `seasonFactor(yearFraction, peak, strength)` is a **triangle wave** (plain arithmetic, no `Math.sin`) that averages exactly 1 over a year.
+  Grain peaks mid-summer, fruit mid-autumn, so trade demand changes with the seasons. `state.season = {year, name, grainFactor, fruitFactor}`.
 
 *Why typed arrays:* 30,000 cell objects would be slow and heavy. Flat arrays are compact and fast.
 

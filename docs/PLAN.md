@@ -27,9 +27,9 @@
 **Goal:** terrain, two resources and seasons, so geography starts deciding where life does well.
 - [x] 1. `noise.js`: seeded 2D **value noise** + octaves (smoothstep interpolation, no `Math.sin`). Start `tests.html`: same seed → same map.
 - [x] 2. Terrain from elevation: water / plains / forest / hills / mountain. Water + mountain can't be crossed. Terrain gets drawn once to a cached canvas.
-- [ ] 3. Two resources: **grain** (dry lowlands) and **fruit** (wet forest), with per-cell caps from terrain. Agents carry both, head for the one they lack most, and die if either hits 0.
-- [ ] 4. Seasons: a triangle-wave regrowth multiplier per resource with a phase offset (grain peaks in summer, fruit in autumn). Show the season in the overlay.
-- [ ] 5. Fading **trails** layer (render only, doesn't affect the sim).
+- [x] 3. Two resources: **grain** (dry lowlands) and **fruit** (wet forest), with per-cell caps from terrain. Agents carry both, head for the one they lack most, and die if either hits 0.
+- [x] 4. Seasons: a triangle-wave regrowth multiplier per resource with a phase offset (grain peaks in summer, fruit in autumn). Show the season in the overlay.
+- [x] 5. Fading **trails** layer (render only, doesn't affect the sim).
 
 **Files:** `noise.js`, `world.js`, `agent.js`, `sim.js`, `render.js`, `config.js`, `tests.html`
 **Done when:** the map looks like a landscape · agents gather in fertile zones and migrate with the seasons · same seed → same map.

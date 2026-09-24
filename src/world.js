@@ -83,6 +83,29 @@ export function isPassable(world, x, y) {
   return PASSABLE[world.terrain[y * world.width + x]];
 }
 
+// ---------- Time and seasons ----------
+// The year runs 0 -> 1: spring [0, 0.25), summer [0.25, 0.5), autumn [0.5, 0.75), winter [0.75, 1).
+export const SEASON_NAMES = ['spring', 'summer', 'autumn', 'winter'];
+
+export function yearFraction(tick, ticksPerYear) {
+  return (tick % ticksPerYear) / ticksPerYear;
+}
+
+export function seasonName(frac) {
+  return SEASON_NAMES[Math.floor(frac * 4)];
+}
+
+// Regrowth multiplier for a resource that grows fastest at `peak` in the year.
+// Shape: a TRIANGLE wave: straight lines up to the peak, then down. Pure arithmetic, so
+// it's identical in every browser (Math.sin could differ in the last bits and break determinism).
+// Returns 1 - strength (worst moment) .. 1 + strength (peak). Averages exactly 1 over a year.
+export function seasonFactor(frac, peak, strength) {
+  let d = Math.abs(frac - peak);   // distance from the peak, in years...
+  if (d > 0.5) d = 1 - d;          // ...going the SHORT way round (the year wraps: winter -> spring)
+  const closeness = 1 - 2 * d;     // 1 at the peak, 0 half a year away
+  return 1 + strength * (2 * closeness - 1);
+}
+
 // Every cell grows back a FRACTION OF ITS OWN CAP each tick.
 // Why not a flat amount? With a flat +0.02, a forest cell (small grain cap) would still
 // PRODUCE grain as fast as a plains cell whenever someone kept eating it: the cap only

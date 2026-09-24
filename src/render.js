@@ -3,7 +3,8 @@
 // Layers, bottom to top:
 //   1. terrain: painted ONCE into a hidden canvas (terrain never changes), reused every frame
 //   2. food:    repainted every frame as semi-transparent green on top of the terrain
-//   3. agents, then the debug overlay
+//   3. trails:  fading footprints (render-only: purely visual, never touches the sim)
+//   4. agents, then the debug overlay
 // Each layer is 1 pixel per cell, stretched onto the screen with ONE drawImage call.
 
 import { WATER, PLAINS, FOREST, HILLS, MOUNTAIN } from './world.js';
@@ -38,6 +39,7 @@ export function createRenderer(canvas, world) {
   const ctx = canvas.getContext('2d');
   const terrainLayer = makeLayer(world);
   const foodLayer = makeLayer(world);
+  const trailLayer = makeLayer(world);   // we draw on this one with normal canvas calls, not pixels
 
   paintTerrain(terrainLayer, world);   // once, up front
 
@@ -78,6 +80,25 @@ export function createRenderer(canvas, world) {
     foodLayer.ctx.putImageData(foodLayer.image, 0, 0);
   }
 
+  // Trails: each frame, (1) fade everything already on the layer a little, then
+  // (2) stamp a faint dot where every agent stands. Recent steps are strong, old ones fade out.
+  function paintTrails(agents, fade) {
+    const t = trailLayer.ctx;
+    // "destination-out" = whatever we draw ERASES what's there, by the drawn alpha.
+    // Filling the whole layer with alpha 0.08 removes 8% of every pixel's opacity.
+    t.globalCompositeOperation = 'destination-out';
+    t.fillStyle = `rgba(0, 0, 0, ${fade})`;
+    t.fillRect(0, 0, world.width, world.height);
+    // Note: opacity is stored as whole numbers 0..255, so a very faint pixel (alpha < ~6)
+    // rounds back to itself and never fully disappears. A bigger fade keeps that ghost invisible.
+
+    t.globalCompositeOperation = 'source-over';   // back to normal painting
+    t.fillStyle = 'rgba(255, 111, 89, 0.35)';     // agent coral, faint
+    for (const a of agents) t.fillRect(a.x, a.y, 1, 1);   // 1 pixel = 1 cell on this layer
+  }
+  // (Fading happens per FRAME, so trails fade a bit faster on a 144Hz screen. Fine for a
+  //  purely visual effect; the sim itself is unaffected.)
+
   // Agents: one small square each. Same color for everyone, so we set fillStyle ONCE
   // (changing it per agent is surprisingly slow). Coral, so it stands out from gold and green.
   // Tribe colors arrive in S3.
@@ -91,10 +112,11 @@ export function createRenderer(canvas, world) {
   }
 
   function drawOverlay(lines) {
+    ctx.font = '14px monospace';   // set the font FIRST: measureText uses the current font
+    const width = Math.max(...lines.map(l => ctx.measureText(l).width)) + 14;  // box fits the longest line
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.fillRect(6, 6, 230, 12 + lines.length * 18);
+    ctx.fillRect(6, 6, width, 12 + lines.length * 18);
     ctx.fillStyle = '#7fd1b9';
-    ctx.font = '14px monospace';
     lines.forEach((text, i) => ctx.fillText(text, 12, 24 + i * 18));
   }
 
@@ -106,6 +128,10 @@ export function createRenderer(canvas, world) {
     drawLayer(terrainLayer, view);
     paintFood(config.foodMax);
     drawLayer(foodLayer, view);   // drawImage respects alpha, so terrain shows through
+    if (config.view.trails) {
+      paintTrails(state.agents, config.view.trailFade);
+      drawLayer(trailLayer, view);
+    }
     drawAgents(view, state.agents);
     drawOverlay(overlayLines);
   }

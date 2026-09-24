@@ -3,14 +3,15 @@
 // and why the same seed always gives the same history.
 
 import { createRng, hashString } from './rng.js';
-import { createWorld, regrow, isPassable } from './world.js';
+import { createWorld, regrow, isPassable, yearFraction, seasonName, seasonFactor } from './world.js';
 import { createAgent, moveTowardFood, eat, metabolize } from './agent.js';
 
 // Build a brand-new world from config. Reset = call this again.
 export function createSim(config, width, height) {
   const rng = createRng(hashString(config.seed));
   const world = createWorld(width, height, rng, config);
-  const state = { tick: 0, rng, world, agents: [], nextAgentId: 1 };
+  const state = { tick: 0, rng, world, agents: [], nextAgentId: 1, season: null };
+  updateSeason(state, config);
 
   for (let n = 0; n < config.initialAgents; n++) {
     // Re-roll until we land on walkable ground (no spawning in lakes or on peaks).
@@ -29,8 +30,11 @@ export function createSim(config, width, height) {
 // Advance exactly ONE tick. The ORDER of these phases is part of the rules:
 // change it and you change history (and the RNG sequence).
 export function step(state, config) {
-  // 1. Food grows back.
-  regrow(state.world, config.grainRegrowth, config.fruitRegrowth);
+  // 1. Food grows back, faster or slower depending on the season.
+  updateSeason(state, config);
+  regrow(state.world,
+    config.grainRegrowth * state.season.grainFactor,
+    config.fruitRegrowth * state.season.fruitFactor);
 
   // 2. Shuffle who goes first. Without this, agent #0 would ALWAYS get first pick
   //    of the food, a hidden unfair advantage baked into the array order.
@@ -48,6 +52,20 @@ export function step(state, config) {
   removeDead(state.agents);
 
   state.tick++;
+}
+
+// Work out where we are in the year. Stored on state so the overlay (and later the
+// History Book) can read it without re-computing anything.
+function updateSeason(state, config) {
+  const frac = yearFraction(state.tick, config.ticksPerYear);
+  const s = config.seasons;
+  const on = config.features.seasons;
+  state.season = {
+    year: Math.floor(state.tick / config.ticksPerYear) + 1,
+    name: seasonName(frac),
+    grainFactor: on ? seasonFactor(frac, s.grainPeak, s.strength) : 1,
+    fruitFactor: on ? seasonFactor(frac, s.fruitPeak, s.strength) : 1,
+  };
 }
 
 // One-pass "compaction": copy each living agent down to the next free slot, then

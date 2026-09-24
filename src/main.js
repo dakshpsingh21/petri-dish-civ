@@ -65,6 +65,8 @@ function frame(now) {
     `FPS   ${meter.fps}`,
     `TPS   ${meter.tps}  (target ${config.ticksPerSecond})`,
     `tick  ${state.tick}`,
+    `year  ${state.season.year}  ${state.season.name}`,
+    `grow  grain x${state.season.grainFactor.toFixed(2)}  fruit x${state.season.fruitFactor.toFixed(2)}`,
     `alive ${state.agents.length}`,
     `seed  ${config.seed}`,
   ]);
