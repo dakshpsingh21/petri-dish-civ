@@ -1,0 +1,13 @@
+/* Remove the browser's default 8px margin so the canvas can fill the window. */
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;          /* no scrollbars: the canvas is the whole page */
+  background: #10141c;
+}
+
+/* A canvas is inline by default, which leaves a few pixels of gap under it.
+   display: block removes that gap. */
+canvas {
+  display: block;
+}
