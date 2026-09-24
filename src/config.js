@@ -12,4 +12,11 @@ export const config = {
   ticksPerSecond: 20,   // sim speed: world-steps per real second (independent of screen refresh rate)
   foodMax: 10,          // most food one cell can hold
   foodRegrowth: 0.02,   // food added to every cell per tick (0 -> full takes foodMax / this = 500 ticks)
+
+  initialAgents: 2000,  // deliberately MORE than the world can feed, so we see a die-off
+  startEnergy: 20,      // energy each starting agent spawns with
+  maxEnergy: 40,        // an agent can't store more than this
+  biteSize: 2,          // most food an agent eats per tick
+  metabolism: 0.5,      // energy burned per tick just by being alive
+  // Rough carrying capacity = total regrowth / metabolism = (200*150*0.02) / 0.5 = 1200 agents
 };

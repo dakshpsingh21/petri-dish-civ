@@ -47,6 +47,17 @@ export function createRenderer(canvas, world) {
     ctx.drawImage(layer, view.x, view.y, view.w, view.h);
   }
 
+  // Agents: one small square each. Same color for everyone, so we set fillStyle ONCE
+  // (changing it per agent is surprisingly slow). Tribe colors arrive in S3.
+  function drawAgents(view, agents) {
+    const inset = view.scale >= 4 ? 1 : 0;   // leave a 1px gap so crowded agents stay readable
+    const size = view.scale - inset * 2;
+    ctx.fillStyle = '#ffd166';
+    for (const a of agents) {
+      ctx.fillRect(view.x + a.x * view.scale + inset, view.y + a.y * view.scale + inset, size, size);
+    }
+  }
+
   function drawOverlay(lines) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.fillRect(6, 6, 230, 12 + lines.length * 18);
@@ -59,7 +70,9 @@ export function createRenderer(canvas, world) {
   function render(state, config, overlayLines) {
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawFood(fitView(), config.foodMax);
+    const view = fitView();
+    drawFood(view, config.foodMax);
+    drawAgents(view, state.agents);
     drawOverlay(overlayLines);
   }
 

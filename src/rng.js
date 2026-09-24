@@ -29,9 +29,21 @@ export function createRng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296; // divide by 2^32 -> [0, 1)
   }
 
+  // Fisher-Yates shuffle, in place: walk backwards, swap each item with a random
+  // earlier-or-same position. Every ordering is equally likely.
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(next() * (i + 1));
+      const tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+    }
+  }
+
   return {
     next,
     int: (n) => Math.floor(next() * n),               // integer 0..n-1
     range: (min, max) => min + next() * (max - min),  // float in [min, max)
+    shuffle,
   };
 }

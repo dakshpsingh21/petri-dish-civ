@@ -1,26 +1,12 @@
 // main.js: entry point. Owns the browser loop and wires sim <-> screen.
-// S1 step 3: world with regrowing food, drawn by render.js.
+// It knows about BOTH the sim and the page. sim.js knows nothing about the page.
 
 import { config, MAX_STEPS_PER_FRAME, MAX_FRAME_MS, WORLD_WIDTH, WORLD_HEIGHT } from './config.js';
-import { createRng, hashString } from './rng.js';
-import { createWorld, regrow } from './world.js';
+import { createSim, step } from './sim.js';
 import { createRenderer } from './render.js';
 
 const canvas = document.getElementById('world');
-
-// ---------- Sim state (moves to sim.js in step 4) ----------
-const rng = createRng(hashString(config.seed));
-const state = {
-  tick: 0,
-  rng,
-  world: createWorld(WORLD_WIDTH, WORLD_HEIGHT, rng, config.foodMax),
-};
-
-// Advance the world by exactly ONE tick. Temporary home until sim.js exists.
-function step(state) {
-  regrow(state.world, config.foodRegrowth, config.foodMax);
-  state.tick++;
-}
+const state = createSim(config, WORLD_WIDTH, WORLD_HEIGHT);
 
 // ---------- Canvas sizing ----------
 // Buffer size must match the window or the image stretches. The renderer re-fits
@@ -65,7 +51,7 @@ function frame(now) {
   const stepMs = 1000 / config.ticksPerSecond;
   let steps = 0;
   while (acc >= stepMs && steps < MAX_STEPS_PER_FRAME) {
-    step(state);
+    step(state, config);
     acc -= stepMs;
     steps++;
   }
@@ -79,6 +65,7 @@ function frame(now) {
     `FPS   ${meter.fps}`,
     `TPS   ${meter.tps}  (target ${config.ticksPerSecond})`,
     `tick  ${state.tick}`,
+    `alive ${state.agents.length}`,
     `seed  ${config.seed}`,
   ]);
 
