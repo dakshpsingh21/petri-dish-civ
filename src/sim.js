@@ -5,35 +5,68 @@
 import { createRng, hashString } from './rng.js';
 import { createWorld, regrow, isPassable, yearFraction, seasonName, seasonFactor } from './world.js';
 import { createAgent, rollLifespan, growOlder, moveTowardFood, eat, metabolize, tryReproduce } from './agent.js';
-import { randomGenes, neutralCulture } from './genes.js';
+import { randomGenes, varyGenes, neutralCulture } from './genes.js';
+import { createBus } from './events.js';
+import { createTribes, foundTribe, updatePopulations } from './tribes.js';
 
 // Build a brand-new world from config. Reset = call this again.
-export function createSim(config, width, height) {
+// `bus` is passed IN, so listeners (main.js, tests) can subscribe BEFORE the
+// tick-0 "tribe:founded" events fire. Headless runs can leave it out.
+export function createSim(config, width, height, bus = createBus()) {
   const rng = createRng(hashString(config.seed));
   const world = createWorld(width, height, rng, config);
-  const state = { tick: 0, rng, world, agents: [], nextAgentId: 1, season: null,
-    births: 0, deaths: { starved: 0, oldAge: 0 } };
+  const state = { tick: 0, rng, world, bus, agents: [], nextAgentId: 1, season: null,
+    tribes: createTribes(), births: 0, deaths: { starved: 0, oldAge: 0 } };
   updateSeason(state, config);
 
-  for (let n = 0; n < config.initialAgents; n++) {
-    // Re-roll until we land on walkable ground (no spawning in lakes or on peaks).
-    // The attempt cap stops an endless loop on a map that is ALL water/mountain.
-    let x, y, tries = 0;
-    do {
-      x = rng.int(width);
-      y = rng.int(height);
-    } while (!isPassable(world, x, y) && ++tries < 1000);
-    if (!isPassable(world, x, y)) break;   // no land found: stop spawning
+  // Starting tribes: each gets a random home on land and its own random "base" genes.
+  const homes = [];
+  for (let t = 0; t < config.tribes.startCount; t++) {
+    const home = randomLandCell(world, rng);
+    if (!home) break;
+    home.tribe = foundTribe(state.tribes, randomGenes(rng), 0, 0, rng, bus);
+    homes.push(home);
+  }
+
+  for (let n = 0; n < config.initialAgents && homes.length > 0; n++) {
+    const cell = randomLandCell(world, rng);
+    if (!cell) break;                      // no land found: stop spawning
+    // Join the NEAREST home's tribe -> tribes start as regions, not confetti.
+    // Founders are small variations on their tribe's genes -> tribes differ from day one.
+    const tribe = nearestHome(homes, cell.x, cell.y).tribe;
     const founder = createAgent({
-      id: state.nextAgentId++, x, y, grain: config.startStore, fruit: config.startStore,
-      genes: randomGenes(rng), culture: neutralCulture(), maxAge: rollLifespan(rng, config),
+      id: state.nextAgentId++, x: cell.x, y: cell.y, grain: config.startStore, fruit: config.startStore,
+      genes: varyGenes(tribe.founderGenes, config.tribes.founderSpread, rng), culture: neutralCulture(),
+      maxAge: rollLifespan(rng, config), tribeId: tribe.id,
     });
     // Founders start somewhere in the first half of life, so they don't all hit
-    // old age in the same tick (a fake "mass extinction" in year 3).
+    // old age at once (a fake "mass extinction" around year 2).
     founder.age = rng.int(founder.maxAge >> 1);
     state.agents.push(founder);
   }
+  updatePopulations(state.tribes, state.agents, 0, bus);
   return state;
+}
+
+// Re-roll until we land on walkable ground (no spawning in lakes or on peaks).
+// The attempt cap stops an endless loop on a map that is ALL water/mountain.
+function randomLandCell(world, rng) {
+  for (let tries = 0; tries < 1000; tries++) {
+    const x = rng.int(world.width);
+    const y = rng.int(world.height);
+    if (isPassable(world, x, y)) return { x, y };
+  }
+  return null;
+}
+
+// Plain distance check against every home: only ~8 homes, so no need for anything clever.
+function nearestHome(homes, x, y) {
+  let best = homes[0], bestD = Infinity;
+  for (const h of homes) {
+    const d = (h.x - x) ** 2 + (h.y - y) ** 2;   // squared distance: same order, no sqrt
+    if (d < bestD) { bestD = d; best = h; }
+  }
+  return best;
 }
 
 // Advance exactly ONE tick. The ORDER of these phases is part of the rules:
@@ -64,8 +97,9 @@ export function step(state, config) {
   // 4. Births. After everyone has eaten, so "well fed" means well fed THIS tick.
   if (config.features.reproduction) reproduce(state, config, living);
 
-  // 5. Clear out the dead.
+  // 5. Clear out the dead, then recount tribes (and announce any that died out).
   removeDead(state.agents);
+  updatePopulations(state.tribes, state.agents, state.tick, state.bus);
 
   state.tick++;
 }

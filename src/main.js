@@ -4,9 +4,18 @@
 import { config, MAX_STEPS_PER_FRAME, MAX_FRAME_MS, WORLD_WIDTH, WORLD_HEIGHT } from './config.js';
 import { createSim, step } from './sim.js';
 import { createRenderer } from './render.js';
+import { createBus } from './events.js';
+import { livingTribes } from './tribes.js';
 
 const canvas = document.getElementById('world');
-const state = createSim(config, WORLD_WIDTH, WORLD_HEIGHT);
+
+// Subscribe BEFORE creating the sim, so we also hear the tick-0 "tribe:founded" events.
+// For now events just go to the console; the History Book (S11) will listen here too.
+const bus = createBus();
+bus.on('tribe:founded', e => console.log(`[tick ${e.tick}] The ${e.name} are founded.`));
+bus.on('tribe:extinct', e => console.log(`[tick ${e.tick}] The ${e.name} have died out.`));
+
+const state = createSim(config, WORLD_WIDTH, WORLD_HEIGHT, bus);
 
 // ---------- Canvas sizing ----------
 // Buffer size must match the window or the image stretches. The renderer re-fits
@@ -44,6 +53,14 @@ function averageGenes(agents) {
   return `genes greed ${(sum.greed / n).toFixed(2)} trust ${(sum.trust / n).toFixed(2)} aggr ${(sum.aggression / n).toFixed(2)} mem ${(sum.memory / n).toFixed(2)}`;
 }
 
+// "tribes 7 alive  biggest Karuvel (412)" for the overlay.
+function tribeSummary(tribes) {
+  const alive = livingTribes(tribes);
+  if (alive.length === 0) return 'tribes none';
+  const biggest = alive.reduce((a, b) => (b.population > a.population ? b : a));
+  return `tribes ${alive.length} alive  biggest ${biggest.name} (${biggest.population})`;
+}
+
 // ---------- The fixed-timestep loop ----------
 // Real time pours into a bucket (`acc`). We scoop it out in fixed-size chunks,
 // one tick per chunk, so the sim always moves in identical steps whatever the FPS.
@@ -79,6 +96,7 @@ function frame(now) {
     `alive ${state.agents.length}  (cap ${config.reproduction.maxPopulation})`,
     `born  ${state.births}   died: starved ${state.deaths.starved}  old age ${state.deaths.oldAge}`,
     averageGenes(state.agents),
+    tribeSummary(state.tribes),
     `seed  ${config.seed}`,
   ]);
 

@@ -7,14 +7,14 @@ import { inheritGenes, copyCulture } from './genes.js';
 // Takes ONE object instead of 9 positional arguments: `{ id, x, y, ... }` can't be
 // passed in the wrong order, and adding a field later doesn't break every caller.
 // - grain/fruit: two stores. Running out of EITHER one kills the agent.
-// - parentId 0 = founder (spawned at the start, no parent).
+// - parentId 0 = founder (spawned at the start, no parent). tribeId: see tribes.js.
 // - genes = nature (fixed for life), culture = nurture offsets (see genes.js).
 // - maxAge: dies of old age on reaching it (if the aging flag is on).
 // - lastBirth: age when it last had a child (-Infinity = never), for the birth cooldown.
 // - diedOf: null while alive, then 'starved' or 'oldAge' (the History Book will want this).
 // (Tribe and memory arrive later in S3-S5. Typed arrays only if profiling says so.)
-export function createAgent({ id, x, y, grain, fruit, genes, culture, maxAge, parentId = 0 }) {
-  return { id, parentId, x, y, grain, fruit, age: 0, maxAge, lastBirth: -Infinity, alive: true, diedOf: null, genes, culture };
+export function createAgent({ id, x, y, grain, fruit, genes, culture, maxAge, tribeId, parentId = 0 }) {
+  return { id, parentId, tribeId, x, y, grain, fruit, age: 0, maxAge, lastBirth: -Infinity, alive: true, diedOf: null, genes, culture };
 }
 
 // Lifespan = base +/- up to `spread`, uniform. Always rolled (even with aging off) so
@@ -151,6 +151,6 @@ export function tryReproduce(parent, childId, world, rng, config) {
   const culture = copyCulture(parent.culture);            // nurture: learned from the parent
   return createAgent({
     id: childId, x: cx, y: cy, grain, fruit, genes, culture,
-    maxAge: rollLifespan(rng, config), parentId: parent.id,
+    maxAge: rollLifespan(rng, config), parentId: parent.id, tribeId: parent.tribeId,
   });
 }

@@ -18,16 +18,20 @@ export function randomGenes(rng) {
   return genes;
 }
 
-// Child genes = parent's genes + a small mutation, clamped back into 0..1.
+// New genes = base genes + a small random change each, clamped back into 0..1.
 // (rng() - rng()) is a "tent" shape centred on 0: small changes are common, big ones rare.
-// Flag off -> exact copy (clones), handy as a baseline for experiments.
-export function inheritGenes(parentGenes, rng, config) {
-  const rate = config.features.mutation ? config.mutationRate : 0;
+export function varyGenes(baseGenes, amount, rng) {
   const genes = {};
   for (const name of GENE_NAMES) {
-    genes[name] = clamp01(parentGenes[name] + (rng.next() - rng.next()) * rate);
+    genes[name] = clamp01(baseGenes[name] + (rng.next() - rng.next()) * amount);
   }
   return genes;
+}
+
+// Child genes = parent's genes, varied by the mutation rate.
+// Flag off -> exact copy (clones), handy as a baseline for experiments.
+export function inheritGenes(parentGenes, rng, config) {
+  return varyGenes(parentGenes, config.features.mutation ? config.mutationRate : 0, rng);
 }
 
 // Culture = offsets added on top of genes (effective trait = clamp01(gene + culture + ...)).

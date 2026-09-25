@@ -71,6 +71,11 @@ export const config = {
     agingCost: 0.5,       // metabolism at maxAge = 1.5x a newborn's
   },
 
+  tribes: {
+    startCount: 8,        // starting tribes; each founder joins the tribe whose home is nearest
+    founderSpread: 0.15,  // how far a founder's genes can stray from its tribe's base genes
+  },
+
   reproduction: {
     threshold: 16,        // need at least this much of EACH store to have a child (max 20)
     minAge: 200,          // ticks before an agent can breed (10 s). Fewer doomed babies -> LESS churn
