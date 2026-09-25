@@ -3,44 +3,50 @@
 > Updated at the END of every session (or earlier if the chat gets long).
 > A brand-new chat should be able to continue from this file + PLAN.md + AI_RULES.md alone.
 
-_Last updated: 2026-09-25 · S1 + S2 chat (mode A: AI writes, Daksh reviews)_
+_Last updated: 2026-09-25 · S3 chat (mode A: AI writes, Daksh reviews)_
 
 ## Last completed step
-**S2 complete ✅** (steps 1-5: noise, terrain, grain + fruit, seasons, trails). All verified in headless Chromium by the AI (9/9 tests pass, screenshot OK).
-Daksh still needs to eyeball steps 4-5 in his browser and commit (see "Next step").
+**S3 complete ✅** (steps 1-6: reproduction, genes + mutation, aging, event bus + tribes, tribe splits, agent visuals).
+23/23 tests pass (node + headless Chromium). Screenshot checked at year 10: 60 FPS, outlines make every tribe colour readable.
+Daksh committed steps 1-5; **step 6 (visuals) + S3 docs still need committing** (see "Next step").
 
 ## Current state
 - Repo: `C:\Users\Daksh\Documents\petri-dish-civ` (branch `main`, remote https://github.com/dakshpsingh21/petri-dish-civ). `/docs` = source of truth.
-- Live: https://dakshpsingh21.github.io/petri-dish-civ/ (auto-deploys on push to `main`, 1-2 min). Tests: `/tests.html`.
-- Run locally: `python -m http.server 8000` in repo root -> http://localhost:8000. **Keep DevTools open with Network -> "Disable cache"** (ES modules get cached; stale modules = missing-export errors / old sim).
-- Files: `index.html`, `style.css`, `tests.html`, `.nojekyll`, `src/{main,config,rng,noise,world,agent,sim,render}.js`.
-- What works:
-  - S1: seeded RNG (mulberry32, FNV-1a string hash, Fisher-Yates shuffle), fixed-timestep loop (20 TPS, clamp 250 ms, max 10 steps/frame), overlay (FPS/TPS/tick/year+season/growth factors/alive/seed; box auto-sizes).
-  - `noise.js`: hashed-lattice value noise + smoothstep + 4 octaves; `noiseMap()` -> Float32Array. No Math.sin.
-  - `world.js`: elevation + moisture maps (seeds drawn from main RNG, stretched to 0..1) -> terrain Uint8Array WATER/PLAINS/FOREST/HILLS/MOUNTAIN; PASSABLE + GRAIN_CAP/FRUIT_CAP lookup tables; grain/fruit + caps; regrowth = **fraction of the cell's own cap** per tick; seasons (yearFraction, seasonName, triangle-wave seasonFactor, yearly average exactly 1).
-  - `agent.js`: agents carry grain + fruit (die if either hits 0); move to the neighbour with best `grain*grainHunger + fruit*fruitHunger` (seeded reservoir-sampling tie-break); eat both; metabolize (flag off = double grain burn for fair A/B).
-  - `sim.js`: createSim (spawn only on passable land, 1000-try cap) + step: updateSeason -> regrow -> shuffle -> agents (age, move, eat, metabolize) -> removeDead (compaction). `state.season = {year, name, grainFactor, fruitFactor}`.
-  - `render.js`: layers = cached terrain (painted once, elevation-shaded) -> food (gold/green mix, alpha = amount) -> trails (destination-out fade per frame, render-only) -> coral agents -> overlay.
-  - `config.js`: `features {terrain, twoResources, seasons}`, `terrain {...}`, `view {trails, trailFade}`, `ticksPerYear: 600`, `seasons {strength 0.8, grainPeak .375, fruitPeak .625}`, grain/fruitRegrowth 0.002, startStore 10, maxStore 20, biteSize 2, metabolism 0.25 (each). **Seed is 'daksh'** (Daksh changed it).
-- Headless results (seed "daksh", 2000 start agents, no reproduction yet):
-  - Two resources: settles ~340; **survivors near plains/forest borders 44% vs 30% of land** (emergent ecotone clustering; "petri": 48% vs 28%).
-  - Seasons ON 272 vs OFF 337: same yearly food, 20% fewer survivors -> population is limited by the WORST season (step-wise deaths each lean season).
-  - Grain-only flag: 403. ~0.4-0.75 ms/tick at 2k agents.
-- Headless test pattern: `node --input-type=module -e "const b='<repo>/src/'; const {createSim,step}=await import(b+'sim.js'); ..."`.
+- Live: https://dakshpsingh21.github.io/petri-dish-civ/ (auto-deploys on push to `main`). Tests: `/tests.html`.
+- Run locally: `python -m http.server 8000` in repo root -> http://localhost:8000. **DevTools open, Network -> "Disable cache".**
+- Files: `index.html`, `style.css`, `tests.html`, `.nojekyll`, `src/{main,config,rng,noise,world,agent,genes,events,tribes,sim,render,renderAgents}.js`.
+- What works (S1-S2 summary): seeded RNG, fixed-timestep loop, value-noise terrain, grain + fruit with per-cell caps, seasons, trails, overlay. See git history / ARCHITECTURE for details.
+- S3 (new):
+  - **Reproduction** (`agent.tryReproduce`, `sim.reproduce`): age >= `minAge` 200, both stores >= `threshold` 16, `cooldown` 600 ticks since last child -> child on a random walkable neighbour; parent's stores split in half (food is conserved). Runs after the agent loop, before `removeDead`; loops only to the pre-birth length (newborns act next tick). Pop cap `maxPopulation` 5000 (never reached; food limits first).
+  - **Genes** (`genes.js`): `{greed, trust, aggression, memory}` all 0..1. `varyGenes(base, amount, rng)` = `clamp01(g + (rng()-rng())*amount)` (tent distribution). `inheritGenes` uses `mutationRate` 0.05 (flag `mutation`). Culture `{greed, trust, aggression}` offsets start at 0, child gets a COPY. `effectiveTrait = clamp01(gene + culture)`. `geneDistance` = Euclidean over 4 genes.
+  - **Aging**: `maxAge` = 1200 ± 400 (always rolled, even with flag off, to keep the RNG sequence identical). Metabolism x (1 + 0.5 * age/maxAge). `diedOf` = 'starved' | 'oldAge'; `state.deaths` counts both. Founders start at a random age in the first half of life.
+  - **Events + tribes**: `createBus()` (on returns unsubscribe; emit). `createSim(config, w, h, bus)`: main.js creates the bus and subscribes first, so it hears tick-0 events. 8 starting tribes with random homes; each founder joins the nearest home, genes = `varyGenes(tribe.founderGenes, 0.15)`. Tribe = `{id, name, hue (id*137.508 % 360), founderGenes, parentTribeId, population, foundedTick, extinctTick}`. `updatePopulations` recounts from scratch each tick and emits `tribe:extinct` once. Events: `tribe:founded {tick, tribeId, name, parentTribeId, parentName}`, `tribe:extinct {tick, tribeId, name}` (console only for now).
+  - **Splits**: at birth, if `geneDistance(child, tribe.founderGenes) > splitThreshold` (0.35) -> child founds a new tribe (flag `tribeSplits`). Must stay > 0.3 (max founder spread).
+  - **Visuals** (`renderAgents.js`): colour = tribe hue, 4 age bands (dark = old), size 60-100% by food, dark outline (red if effective aggression > `view.aggressiveEdge` 0.7). Agents grouped by fillStyle; neutral white trails; food alpha 130.
+- Headless results (seed 'daksh' unless noted, 1000 founders, 20-60 years):
+  - Carrying capacity scales with regrowth: 0.002 -> ~310, 0.004 -> ~700, 0.006 -> ~1,200 (now 0.006).
+  - **Breeding earlier = SMALLER population**: minAge 0 -> ~1,060 (median age 90); minAge 200 -> ~1,210 (median 149). Cooldown 0 -> ~1,160, 0% old-age deaths; cooldown 600 -> ~1,400, ~10% old-age deaths, median age 325. Doomed babies waste food.
+  - Neutral **genetic drift**: with no selection, gene averages wander differently per seed (trust 0.51 -> 0.61 on 'daksh', -> 0.39 on 'petri'). Baseline for S4+ (a shift that is consistent across seeds = selection).
+  - Tribes, no splits: no extinctions in 20 years; sizes diverge by geography/luck ('petri': Mardorzen 265 -> 458, Thitodor 71 -> 9).
+  - Splits at 0.35: first ~year 5-7, then ~10-15/year; self-limiting (mean distance from own founder holds ~0.19 for 60 years); ~90 tribes alive at year 50 but only ~15 with 20+ members.
+  - ~0.55-0.7 ms/tick at ~1,200-1,400 agents.
+- Headless test pattern: `node --input-type=module -e "const b='<repo>/src/'; const {createSim,step}=await import(b+'sim.js'); ..."`. tests.html can also be run in node by extracting its module script and stubbing `document`.
 
 ## Next step
-1. **Daksh (before new chat):** hard-refresh, check seasons in overlay + trails, then
-   `git add .` / `git commit -m "feat(world): add seasons and fading trails"` / `git push`.
-2. **New chat: S3 step 1 (Life & lineage):** reproduction: both stores above a threshold -> child in adjacent passable cell, parent's stores split; respect a population cap. Ask mode A/B first (Daksh used A in S1-S2).
+1. **Daksh:** hard-refresh, look at the tribe colours / red edges / dark elders, then commit:
+   `git add .` / `git commit -m "feat(render): colour agents by tribe, size by food, shade by age"` / `git push`.
+   Then a docs commit is included in the same `git add .` (PLAN, HANDOVER, ARCHITECTURE, AI_RULES updated).
+2. **New chat: S4 step 1 (Society):** naive O(n^2) neighbor finding **on purpose**; record baseline ms/tick at 500 / 1k / 2k / 5k agents here. Ask mode A/B first (Daksh used A in S1-S3).
 
 ## Known bugs / open questions
-- Trails fade per FRAME (faster on 144Hz) and 8-bit alpha leaves a faint ghost below ~alpha 6. Render-only, accepted.
-- Die-off is harsh (2000 -> ~270-340) and nothing refills until S3 reproduction. Expect to retune regrowth/metabolism once births exist.
-- Hills look bare (cap 0.3 of each resource). Fine for now; revisit with visuals in S3/S14.
-- GitHub auth: password auth fails; use Git Credential Manager browser login (or fine-grained PAT, never pasted in chat or in the remote URL).
-- AI must never run git from its shell (it left a stale `.git/index.lock` once).
+- **Tribes fully mix by ~year 10** (nothing keeps tribe-mates together). Parked a "tribe cohesion" idea; check first whether S4 interactions cause clustering on their own.
+- **Most deaths are starvation (~90%)**; old age ~10%. Realistic, but S5 elders need old agents: revisit lifespan (900 -> ~28% old age, pop ~1,250) if elders are too rare.
+- ~90 living tribes by year 50, most tiny. History Book (S10) must filter by importance; hues start to look alike past ~20 tribes.
+- `agent.js` is 156 lines (target ~150). If it grows in S4, move movement/eating into their own file.
+- Trails fade per FRAME (faster on 144Hz); 8-bit alpha leaves a faint ghost. Render-only, accepted.
+- GitHub auth: Git Credential Manager browser login (or fine-grained PAT, never pasted in chat).
+- **AI must never run git from its shell, not even `git status`/`git log`** (it left a stale `.git/index.lock` again in S3; fix: `del .git\index.lock`).
 - `config.seed` is hard-coded; URL seeds come in S8.
-- Balance risk grows with each mechanic: add one at a time behind flags, tune before the next.
 - 5k @ 60fps target includes all mechanics; document per-flag cost if one is too expensive.
 - Exact metric for "trade network formed": define before S13.
 
@@ -76,8 +82,24 @@ Daksh still needs to eyeball steps 4-5 in his browser and commit (see "Next step
 | `config.view` for render-only settings (trails) | View settings must never change the sim; no RNG in render |
 | Terrain painted once to a cached layer | Static -> cache it; food/trails change -> redraw |
 | Repo `/docs` is the source of truth; a mirror lives in the Claude project | New chats load the baton cheaply; the repo shows the process to reviewers |
+| Child's food comes out of the parent's stores (split in half) | Conservation: fresh food per birth would create energy from nothing |
+| Reproduction needs minAge 200 + cooldown 600 | Fewer doomed babies -> bigger, older population; old age becomes a real cause of death |
+| Regrowth 0.002 -> 0.006 | With births, regrowth sets carrying capacity (~1,200-1,400 agents) |
+| All genes in 0..1 (`memory` instead of `memorySize`) | One mutate rule for every gene; S4 maps `memory` to a real size |
+| `genes.js` as its own file (pure functions) | Keeps agent.js small; easy to unit-test |
+| Mutation = `(rng()-rng()) * rate` | Tent distribution: small changes common, big ones rare |
+| Culture copied with `{...}` | Parent and child must not share one object |
+| `createAgent({...})` takes one object | 9 positional args are easy to mix up |
+| Lifespan always rolled, even with aging off | Same RNG sequence with flag on/off -> fair A/B |
+| Founders start at a random age | Avoids an artificial mass die-off when all founders hit maxAge together |
+| Bus passed INTO createSim | Listeners subscribe before tick-0 events fire; tests can count events |
+| Tribe populations recounted from scratch each tick | Can never drift out of sync (vs incremental +1/-1) |
+| Starting tribes = nearest of 8 random homes; founders vary around tribe genes | Tribes start as regions and differ genetically (needed for splits) |
+| Split = distance from tribe's FOUNDER genes, checked only at birth | Parent-child distance is at most 0.1, so it would never split; founder is a fixed anchor; genes never change after birth |
+| Agents drawn grouped by fillStyle; outline on every agent | fillStyle changes are slow; outlines keep hues readable on grass and fields |
+| `renderAgents.js` split out of render.js | render.js would pass ~190 lines |
 
 ## Files changed in the last session
-- New: `src/noise.js`, `tests.html`
-- Updated: `src/world.js` (terrain, grain/fruit, seasons), `src/agent.js` (two stores, hunger-weighted movement), `src/sim.js` (passable spawns, seasons), `src/render.js` (layers: terrain cache, food mix, trails, auto-size overlay), `src/config.js` (flags, terrain, seasons, view), `src/main.js` (overlay lines)
-- Docs: `PLAN.md` (S2 ticked), `HANDOVER.md`, `ARCHITECTURE.md` (regrowth + seasons notes)
+- New: `src/genes.js`, `src/events.js`, `src/tribes.js`, `src/renderAgents.js`
+- Updated: `src/agent.js` (object createAgent, lifespans, growOlder, aging metabolism, tryReproduce), `src/sim.js` (bus param, tribes, homes, reproduce, checkSplit, populations, death causes), `src/config.js` (flags reproduction/mutation/aging/tribeSplits; aging, tribes, reproduction knobs; regrowth 0.006; 1000 founders; view.aggressiveEdge), `src/render.js` (uses renderAgents, white trails, food alpha 130), `src/main.js` (bus + console listeners, overlay: births/deaths/genes/tribes/key), `tests.html` (23 tests)
+- Docs: `PLAN.md` (S3 ticked, parked tribe cohesion), `HANDOVER.md`, `ARCHITECTURE.md` (file tree, agent fields), `AI_RULES.md` (genes.js/events.js in sim-code list)

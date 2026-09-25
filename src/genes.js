@@ -42,6 +42,12 @@ export function geneDistance(a, b) {
   return Math.sqrt(sum);
 }
 
+// What behaviour actually uses: gene + culture offset, clamped to 0..1.
+// (S5 adds a third layer, experience, for trust.)
+export function effectiveTrait(agent, name) {
+  return clamp01(agent.genes[name] + (agent.culture[name] ?? 0));
+}
+
 // Culture = offsets added on top of genes (effective trait = clamp01(gene + culture + ...)).
 // Founders start neutral. Elders will pull it around in S5.
 export function neutralCulture() {

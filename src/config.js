@@ -36,6 +36,7 @@ export const config = {
   view: {
     trails: true,       // agents leave fading trails -> migration routes and home ranges appear
     trailFade: 0.08,    // how much of each trail pixel's opacity is erased per frame
+    aggressiveEdge: 0.7, // agents with effective aggression above this get a red edge
   },
 
   ticksPerSecond: 20,   // sim speed: world-steps per real second (independent of screen refresh rate)

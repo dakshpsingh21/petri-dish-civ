@@ -53,7 +53,8 @@ petri-dish-civ/
     ├── commands.js       # god-action queue: UI pushes, sim applies
     ├── sim.js            # step(state): one tick in a fixed phase order
     ├── world.js          # terrain, grain/fruit grids, regrowth, seasons, regions
-    ├── agent.js          # create, move, eat, metabolism, aging, reproduce, mutate
+    ├── agent.js          # create, move, eat, metabolism, aging, reproduce
+    ├── genes.js          # genes + culture: random, vary/mutate, inherit, distance, effective trait
     ├── rules.js          # decide SHARE / TRADE / STEAL + apply outcome (pure-ish)
     ├── minds.js          # memory, tribe opinions, gossip, learned trust, culture, defection
     ├── tribes.js         # registry, names/hues, relations, centroids, moods/raids
@@ -64,6 +65,7 @@ petri-dish-civ/
     ├── chronicle.js      # detects notable events → structured entries
     ├── templates.js      # entries → sentences
     ├── render.js         # draws the layers (§9) under the camera transform
+    ├── renderAgents.js   # agent layer: tribe colour, size = food, dark = old, edges (grouped by colour)
     └── ui/
         ├── controls.js   # grouped knobs, flags, layer toggles, disaster buttons
         ├── setup.js      # New World screen + presets + share link
@@ -102,8 +104,9 @@ world = {
   id: 1042, parentId: 991, tribeId: 3, alive: true,
   x: 17, y: 88,              // integer cell coordinates
   age: 310, maxAge: 900,     // ticks; lifespan = base ± seeded random
+  lastBirth: 250, diedOf: null,  // birth cooldown; 'starved' | 'oldAge' once dead
   grain: 20, fruit: 18,      // two stores; either hits 0 → death. "energy" = grain + fruit
-  genes:      { greed, trust, aggression, memorySize },  // inherited + mutated, fixed for life
+  genes:      { greed, trust, aggression, memory },  // all 0..1; inherited + mutated, fixed for life (memory -> size in S4)
   culture:    { greed, trust, aggression },  // offsets; copied from parent, pulled by elders
   experience: { trust },                     // offset from own life; NOT inherited
   memory:        new Map(),  // otherAgentId -> reputation (-1..+1), LRU capped at memorySize

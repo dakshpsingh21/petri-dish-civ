@@ -41,8 +41,8 @@
 - [x] 2. Genes + inheritance + mutation (`(rng() - rng()) * mutationRate`, clamped). Children also copy the parent's culture (it does nothing until S5).
 - [x] 3. **Aging:** metabolism rises with age; lifespan = base ± a seeded random amount; old age is a cause of death.
 - [x] 4. `events.js` (bus) + `tribes.js` (seeded syllable names, golden-angle hues); emit `tribe:founded` / `tribe:extinct`.
-- [ ] 5. Tribe split: a child that drifts beyond `splitThreshold` from the founder's genes starts a new tribe.
-- [ ] 6. Agent visuals: color = tribe, size = energy, brightness = age, red edge = high aggression.
+- [x] 5. Tribe split: a child that drifts beyond `splitThreshold` from the founder's genes starts a new tribe.
+- [x] 6. Agent visuals: color = tribe, size = energy, brightness = age, red edge = high aggression.
 
 **Files:** `agent.js`, `sim.js`, `events.js`, `tribes.js`, `render.js`, `config.js`
 **Done when:** population rises and falls · generations turn over · colored tribes appear and split.
@@ -180,6 +180,7 @@
 ## PARKED IDEAS 🅿️
 *(Add with a date. Pick up only after S14, or if Daksh explicitly swaps one into a session.)*
 - Terrain painting brush (raise mountains, dig lakes mid-run)
+- (2026-09-25) Tribe cohesion: agents lean toward tribe-mates when moving, so tribes hold territory (right now tribes fully mix by ~year 10). Check first whether S4 interactions already cause it.
 - Replay: put the command log in the share link so edits replay exactly (easy thanks to the command queue)
 - Tribe family-tree view
 - Export the History Book as an image / text

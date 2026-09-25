@@ -99,6 +99,7 @@ function frame(now) {
     `born  ${state.births}   died: starved ${state.deaths.starved}  old age ${state.deaths.oldAge}`,
     averageGenes(state.agents),
     tribeSummary(state.tribes),
+    `key   colour=tribe  size=food  dark=old  red edge=aggressive`,
     `seed  ${config.seed}`,
   ]);
 

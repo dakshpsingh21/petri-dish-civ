@@ -4,10 +4,12 @@
 //   1. terrain: painted ONCE into a hidden canvas (terrain never changes), reused every frame
 //   2. food:    repainted every frame as semi-transparent green on top of the terrain
 //   3. trails:  fading footprints (render-only: purely visual, never touches the sim)
-//   4. agents, then the debug overlay
+//   4. agents (renderAgents.js: colour = tribe, size = food, dark = old, red edge = aggressive)
+//   5. the debug overlay
 // Each layer is 1 pixel per cell, stretched onto the screen with ONE drawImage call.
 
 import { WATER, PLAINS, FOREST, HILLS, MOUNTAIN } from './world.js';
+import { createAgentPainter } from './renderAgents.js';
 
 const BG = '#10141c';
 
@@ -21,7 +23,7 @@ TERRAIN_RGB[MOUNTAIN] = [140, 140, 148];
 
 const GRAIN_RGB = [232, 196, 72];   // golden
 const FRUIT_RGB = [96, 200, 90];    // fresh green
-const FOOD_MAX_ALPHA = 170;         // full food = strong color, but terrain still shows through
+const FOOD_MAX_ALPHA = 130;         // full food = clear color, but calm enough that agents pop
 
 // A world-sized hidden canvas + its raw pixel memory.
 function makeLayer(world) {
@@ -40,6 +42,8 @@ export function createRenderer(canvas, world) {
   const terrainLayer = makeLayer(world);
   const foodLayer = makeLayer(world);
   const trailLayer = makeLayer(world);   // we draw on this one with normal canvas calls, not pixels
+
+  const drawAgents = createAgentPainter(ctx);
 
   paintTerrain(terrainLayer, world);   // once, up front
 
@@ -93,23 +97,11 @@ export function createRenderer(canvas, world) {
     // rounds back to itself and never fully disappears. A bigger fade keeps that ghost invisible.
 
     t.globalCompositeOperation = 'source-over';   // back to normal painting
-    t.fillStyle = 'rgba(255, 111, 89, 0.35)';     // agent coral, faint
+    t.fillStyle = 'rgba(255, 255, 255, 0.22)';    // neutral faint white: tribe colours stay on the agents
     for (const a of agents) t.fillRect(a.x, a.y, 1, 1);   // 1 pixel = 1 cell on this layer
   }
   // (Fading happens per FRAME, so trails fade a bit faster on a 144Hz screen. Fine for a
   //  purely visual effect; the sim itself is unaffected.)
-
-  // Agents: one small square each. Same color for everyone, so we set fillStyle ONCE
-  // (changing it per agent is surprisingly slow). Coral, so it stands out from gold and green.
-  // Tribe colors arrive in S3.
-  function drawAgents(view, agents) {
-    const inset = view.scale >= 4 ? 1 : 0;   // leave a 1px gap so crowded agents stay readable
-    const size = view.scale - inset * 2;
-    ctx.fillStyle = '#ff6f59';
-    for (const a of agents) {
-      ctx.fillRect(view.x + a.x * view.scale + inset, view.y + a.y * view.scale + inset, size, size);
-    }
-  }
 
   function drawOverlay(lines) {
     ctx.font = '14px monospace';   // set the font FIRST: measureText uses the current font
@@ -132,7 +124,7 @@ export function createRenderer(canvas, world) {
       paintTrails(state.agents, config.view.trailFade);
       drawLayer(trailLayer, view);
     }
-    drawAgents(view, state.agents);
+    drawAgents(view, state, config);
     drawOverlay(overlayLines);
   }
 
