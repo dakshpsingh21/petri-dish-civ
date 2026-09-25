@@ -37,8 +37,8 @@
 
 ## S3: Life & lineage 🧬
 **Goal:** generations turn over, traits evolve, tribes form and split.
-- [ ] 1. Reproduction: both stores above a threshold → child in an adjacent cell, parent's stores split; respect the population cap.
-- [ ] 2. Genes + inheritance + mutation (`(rng() - rng()) * mutationRate`, clamped). Children also copy the parent's culture (it does nothing until S5).
+- [x] 1. Reproduction: both stores above a threshold → child in an adjacent cell, parent's stores split; respect the population cap.
+- [x] 2. Genes + inheritance + mutation (`(rng() - rng()) * mutationRate`, clamped). Children also copy the parent's culture (it does nothing until S5).
 - [ ] 3. **Aging:** metabolism rises with age; lifespan = base ± a seeded random amount; old age is a cause of death.
 - [ ] 4. `events.js` (bus) + `tribes.js` (seeded syllable names, golden-angle hues); emit `tribe:founded` / `tribe:extinct`.
 - [ ] 5. Tribe split: a child that drifts beyond `splitThreshold` from the founder's genes starts a new tribe.

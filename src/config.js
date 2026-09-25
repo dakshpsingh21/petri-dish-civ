@@ -15,6 +15,9 @@ export const config = {
     terrain: true,      // false = the whole map is plains (the S1 world)
     twoResources: true, // false = grain only (agents don't need fruit)
     seasons: true,      // false = regrowth is the same all year
+    reproduction: true, // false = no births (the S1-S2 world: one generation, then empty)
+    mutation: true,     // false = children are exact gene clones of their parent
+    aging: true,        // false = nobody dies of old age, metabolism stays flat
   },
 
   // Terrain generation (becomes New World setup sliders in S8).
@@ -36,10 +39,12 @@ export const config = {
 
   ticksPerSecond: 20,   // sim speed: world-steps per real second (independent of screen refresh rate)
   foodMax: 10,          // most of ONE resource a cell can hold (terrain decides how much of that it gets)
-  // Regrowth = FRACTION OF A CELL'S OWN CAP regrown per tick (0.002 -> empty to full in 500 ticks).
+  // Regrowth = FRACTION OF A CELL'S OWN CAP regrown per tick (0.006 -> empty to full in ~170 ticks).
   // So fertile cells produce more per tick, and poor cells barely produce at all.
-  grainRegrowth: 0.002,
-  fruitRegrowth: 0.002,
+  // With births on, THIS sets the carrying capacity (headless, seed 'daksh'):
+  // 0.002 -> ~310 agents, 0.004 -> ~700, 0.006 -> ~1,200. Population scales with food.
+  grainRegrowth: 0.006,
+  fruitRegrowth: 0.006,
 
   // Time: one "year" = this many ticks (30 s at 20 TPS). The History Book will count in years.
   ticksPerYear: 600,
@@ -51,9 +56,27 @@ export const config = {
     fruitPeak: 0.625,   // fruit peaks later (mid-autumn), so the two harvests don't line up
   },
 
-  initialAgents: 2000,  // deliberately MORE than the world can feed, so we see a die-off
+  initialAgents: 1000,  // founders; births take it from here
   startStore: 10,       // grain AND fruit each agent spawns with
   maxStore: 20,         // most of EACH resource an agent can carry
   biteSize: 2,          // most of EACH resource an agent eats per tick
   metabolism: 0.25,     // amount of EACH resource burned per tick (total 0.5, same as S1)
+
+  // Genes are 0..1. Each child gene = parent + (rng() - rng()) * mutationRate, clamped.
+  mutationRate: 0.05,   // max change per generation per gene (typical change is much smaller)
+
+  aging: {
+    lifespanBase: 1200,   // ticks (2 years at 600 ticks/year = one minute of real time)
+    lifespanSpread: 400,  // each agent's maxAge = base +/- up to this (seeded)
+    agingCost: 0.5,       // metabolism at maxAge = 1.5x a newborn's
+  },
+
+  reproduction: {
+    threshold: 16,        // need at least this much of EACH store to have a child (max 20)
+    minAge: 200,          // ticks before an agent can breed (10 s). Fewer doomed babies -> LESS churn
+                          // and a BIGGER population (minAge 0: ~1,060, median age 90; 200: ~1,210, median 149)
+    cooldown: 600,        // ticks between children (one a year). Fewer births -> fewer starving babies:
+                          // cooldown 0: ~1,160 agents, 0% old-age deaths; 600: ~1,400, ~10% old age
+    maxPopulation: 5000,  // hard safety cap (perf target). Food should limit us long before this.
+  },
 };

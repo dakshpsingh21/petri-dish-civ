@@ -4,13 +4,15 @@
 
 import { createRng, hashString } from './rng.js';
 import { createWorld, regrow, isPassable, yearFraction, seasonName, seasonFactor } from './world.js';
-import { createAgent, moveTowardFood, eat, metabolize } from './agent.js';
+import { createAgent, rollLifespan, growOlder, moveTowardFood, eat, metabolize, tryReproduce } from './agent.js';
+import { randomGenes, neutralCulture } from './genes.js';
 
 // Build a brand-new world from config. Reset = call this again.
 export function createSim(config, width, height) {
   const rng = createRng(hashString(config.seed));
   const world = createWorld(width, height, rng, config);
-  const state = { tick: 0, rng, world, agents: [], nextAgentId: 1, season: null };
+  const state = { tick: 0, rng, world, agents: [], nextAgentId: 1, season: null,
+    births: 0, deaths: { starved: 0, oldAge: 0 } };
   updateSeason(state, config);
 
   for (let n = 0; n < config.initialAgents; n++) {
@@ -22,7 +24,14 @@ export function createSim(config, width, height) {
       y = rng.int(height);
     } while (!isPassable(world, x, y) && ++tries < 1000);
     if (!isPassable(world, x, y)) break;   // no land found: stop spawning
-    state.agents.push(createAgent(state.nextAgentId++, x, y, config.startStore));
+    const founder = createAgent({
+      id: state.nextAgentId++, x, y, grain: config.startStore, fruit: config.startStore,
+      genes: randomGenes(rng), culture: neutralCulture(), maxAge: rollLifespan(rng, config),
+    });
+    // Founders start somewhere in the first half of life, so they don't all hit
+    // old age in the same tick (a fake "mass extinction" in year 3).
+    founder.age = rng.int(founder.maxAge >> 1);
+    state.agents.push(founder);
   }
   return state;
 }
@@ -40,18 +49,44 @@ export function step(state, config) {
   //    of the food, a hidden unfair advantage baked into the array order.
   state.rng.shuffle(state.agents);
 
-  // 3. Each agent lives one tick.
+  // 3. Each agent lives one tick. Count survivors and causes of death as we go.
+  let living = 0;
   for (const agent of state.agents) {
-    agent.age++;
-    moveTowardFood(agent, state.world, state.rng, config);
-    eat(agent, state.world, config);
-    metabolize(agent, config);
+    if (!growOlder(agent, config)) {          // died of old age -> skip the rest
+      moveTowardFood(agent, state.world, state.rng, config);
+      eat(agent, state.world, config);
+      metabolize(agent, config);
+    }
+    if (agent.alive) living++;
+    else state.deaths[agent.diedOf]++;
   }
 
-  // 4. Clear out the dead.
+  // 4. Births. After everyone has eaten, so "well fed" means well fed THIS tick.
+  if (config.features.reproduction) reproduce(state, config, living);
+
+  // 5. Clear out the dead.
   removeDead(state.agents);
 
   state.tick++;
+}
+
+// Every living, well-fed agent may have ONE child per tick, until the population cap.
+// The order was shuffled in step 2, so near the cap nobody always wins the last slot.
+// We loop only up to the length BEFORE any births: newborns wait until next tick.
+function reproduce(state, config, living) {
+  const cap = config.reproduction.maxPopulation;
+  const n = state.agents.length;
+  for (let i = 0; i < n && living < cap; i++) {
+    const parent = state.agents[i];
+    if (!parent.alive) continue;
+    const child = tryReproduce(parent, state.nextAgentId, state.world, state.rng, config);
+    if (child) {
+      state.nextAgentId++;
+      state.agents.push(child);
+      state.births++;
+      living++;
+    }
+  }
 }
 
 // Work out where we are in the year. Stored on state so the overlay (and later the

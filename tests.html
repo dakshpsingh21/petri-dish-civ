@@ -23,6 +23,8 @@
     import { createSim, step } from './src/sim.js';
     import { config, WORLD_WIDTH, WORLD_HEIGHT } from './src/config.js';
     import { PASSABLE } from './src/world.js';
+    import { GENE_NAMES, inheritGenes, copyCulture, neutralCulture } from './src/genes.js';
+    import { metabolize } from './src/agent.js';
 
     const list = document.getElementById('results');
     function test(name, fn) {
@@ -66,13 +68,81 @@
     });
 
     // ---------- sim.js ----------
-    test('sim: same seed, 300 ticks -> identical agents', () => {
+    test('sim: same seed, 600 ticks (births included) -> identical agents', () => {
       const run = () => {
         const s = createSim(config, WORLD_WIDTH, WORLD_HEIGHT);
-        for (let t = 0; t < 300; t++) step(s, config);
-        return s.agents.map(a => `${a.id},${a.x},${a.y},${a.grain},${a.fruit}`).join('|');
+        for (let t = 0; t < 600; t++) step(s, config);
+        return s.agents.map(a => `${a.id},${a.x},${a.y},${a.grain},${a.fruit},${Object.values(a.genes)}`).join('|');
       };
       assert(run() === run(), 'runs diverged');
+    });
+
+    // ---------- reproduction ----------
+    test('births: children appear, know their parent, and never break the pop cap', () => {
+      const c = structuredClone(config);
+      c.reproduction.maxPopulation = 1100;
+      const s = createSim(c, WORLD_WIDTH, WORLD_HEIGHT);
+      for (let t = 0; t < 800; t++) {
+        step(s, c);
+        assert(s.agents.length <= c.reproduction.maxPopulation, `pop ${s.agents.length} over cap at tick ${t}`);
+      }
+      assert(s.births > 0, 'no births in 800 ticks');
+      assert(s.agents.some(a => a.parentId > 0), 'no living agent has a parent');
+    });
+    test('births: flag off -> nobody is ever born', () => {
+      const c = structuredClone(config);
+      c.features.reproduction = false;
+      const s = createSim(c, WORLD_WIDTH, WORLD_HEIGHT);
+      for (let t = 0; t < 400; t++) step(s, c);
+      assert(s.births === 0 && s.agents.every(a => a.parentId === 0), 'someone was born');
+    });
+
+    // ---------- genes ----------
+    test('genes: children stay within mutationRate of the parent, inside 0..1', () => {
+      const rng = createRng(7);
+      const parent = { greed: 0.5, trust: 0.99, aggression: 0.01, memory: 0.5 };
+      for (let n = 0; n < 1000; n++) {
+        const child = inheritGenes(parent, rng, config);
+        for (const g of GENE_NAMES) {
+          assert(child[g] >= 0 && child[g] <= 1, `${g} out of 0..1: ${child[g]}`);
+          assert(Math.abs(child[g] - parent[g]) <= config.mutationRate, `${g} jumped too far`);
+        }
+      }
+    });
+    test('genes: mutation flag off -> exact clone', () => {
+      const c = structuredClone(config);
+      c.features.mutation = false;
+      const parent = { greed: 0.3, trust: 0.6, aggression: 0.9, memory: 0.1 };
+      const child = inheritGenes(parent, createRng(1), c);
+      for (const g of GENE_NAMES) assert(child[g] === parent[g], `${g} changed`);
+    });
+    test('culture: child gets a COPY (changing it leaves the parent alone)', () => {
+      const parent = neutralCulture();
+      const child = copyCulture(parent);
+      child.trust = 0.5;
+      assert(parent.trust === 0 && child !== parent, 'parent and child share one culture object');
+    });
+
+    // ---------- aging ----------
+    test('aging: nobody alive is past their maxAge, and some die of old age (3000 ticks)', () => {
+      const s = createSim(config, WORLD_WIDTH, WORLD_HEIGHT);
+      for (let t = 0; t < 3000; t++) step(s, config);
+      assert(s.agents.every(a => a.age < a.maxAge), 'someone outlived maxAge');
+      assert(s.deaths.oldAge > 0, 'no old-age deaths');
+    });
+    test('aging: flag off -> zero old-age deaths', () => {
+      const c = structuredClone(config);
+      c.features.aging = false;
+      const s = createSim(c, WORLD_WIDTH, WORLD_HEIGHT);
+      for (let t = 0; t < 3000; t++) step(s, c);
+      assert(s.deaths.oldAge === 0, `${s.deaths.oldAge} old-age deaths`);
+    });
+    test('aging: an old agent burns more food than a young one', () => {
+      const young = { age: 0, maxAge: 1000, grain: 10, fruit: 10 };
+      const old = { age: 900, maxAge: 1000, grain: 10, fruit: 10 };
+      metabolize(young, config);
+      metabolize(old, config);
+      assert(old.grain < young.grain, `old ${old.grain} vs young ${young.grain}`);
     });
 
     // ---------- world.js terrain ----------

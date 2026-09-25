@@ -1,12 +1,38 @@
 // agent.js: what ONE agent is and what it does. Pure sim code: no DOM, no Math.random().
 
 import { cellIndex, isPassable } from './world.js';
+import { inheritGenes, copyCulture } from './genes.js';
 
 // Plain object for now: easy to read and inspect in the console.
-// Agents carry TWO stores. Running out of EITHER one kills them.
-// (Traits, tribe, memory arrive in S3-S5. Typed arrays only if profiling says so.)
-export function createAgent(id, x, y, startStore) {
-  return { id, x, y, grain: startStore, fruit: startStore, age: 0, alive: true };
+// Takes ONE object instead of 9 positional arguments: `{ id, x, y, ... }` can't be
+// passed in the wrong order, and adding a field later doesn't break every caller.
+// - grain/fruit: two stores. Running out of EITHER one kills the agent.
+// - parentId 0 = founder (spawned at the start, no parent).
+// - genes = nature (fixed for life), culture = nurture offsets (see genes.js).
+// - maxAge: dies of old age on reaching it (if the aging flag is on).
+// - lastBirth: age when it last had a child (-Infinity = never), for the birth cooldown.
+// - diedOf: null while alive, then 'starved' or 'oldAge' (the History Book will want this).
+// (Tribe and memory arrive later in S3-S5. Typed arrays only if profiling says so.)
+export function createAgent({ id, x, y, grain, fruit, genes, culture, maxAge, parentId = 0 }) {
+  return { id, parentId, x, y, grain, fruit, age: 0, maxAge, lastBirth: -Infinity, alive: true, diedOf: null, genes, culture };
+}
+
+// Lifespan = base +/- up to `spread`, uniform. Always rolled (even with aging off) so
+// the RNG sequence is the same either way: flag on/off then compare like with like.
+export function rollLifespan(rng, config) {
+  const { lifespanBase, lifespanSpread } = config.aging;
+  return Math.round(lifespanBase + rng.range(-lifespanSpread, lifespanSpread));
+}
+
+// One tick older. Returns true if that was the last one (death by old age).
+export function growOlder(agent, config) {
+  agent.age++;
+  if (config.features.aging && agent.age >= agent.maxAge) {
+    agent.alive = false;
+    agent.diedOf = 'oldAge';
+    return true;
+  }
+  return false;
 }
 
 // Handy total for things like drawing size later. Not stored, so it can never go stale.
@@ -71,12 +97,60 @@ export function eat(agent, world, config) {
 
 // Being alive burns some of EACH store. Hit 0 in either and you die.
 // That "need both" rule is what forces travel between plains and forest (and later, trade).
+// Aging: the body gets less efficient. Burn rises linearly with age, up to
+// (1 + agingCost)x at maxAge. So old agents are the first to go in a lean season,
+// and old age isn't just a switch that flips at the end.
 export function metabolize(agent, config) {
+  const ageFactor = config.features.aging ? 1 + config.aging.agingCost * (agent.age / agent.maxAge) : 1;
+  const burn = config.metabolism * ageFactor;
   if (config.features.twoResources) {
-    agent.grain -= config.metabolism;
-    agent.fruit -= config.metabolism;
+    agent.grain -= burn;
+    agent.fruit -= burn;
   } else {
-    agent.grain -= config.metabolism * 2;   // same TOTAL need, so flag on/off is a fair comparison
+    agent.grain -= burn * 2;   // same TOTAL need, so flag on/off is a fair comparison
   }
-  if (agent.grain <= 0 || agent.fruit <= 0) agent.alive = false;
+  if (agent.grain <= 0 || agent.fruit <= 0) {
+    agent.alive = false;
+    agent.diedOf = 'starved';
+  }
+}
+
+// Well fed in BOTH stores? Have a child on a random walkable neighbour cell.
+// The parent's stores are split in half: the child gets one half, the parent keeps the other.
+// That split is the "cost" of a child, and also a natural cooldown: the parent must eat
+// its way back up to the threshold before it can breed again.
+// Returns the new child, or null (not fed enough, or boxed in by water/mountain).
+export function tryReproduce(parent, childId, world, rng, config) {
+  const t = config.reproduction.threshold;
+  const needsFruit = config.features.twoResources;
+  if (parent.age < config.reproduction.minAge) return null;   // too young to be a parent
+  if (parent.age - parent.lastBirth < config.reproduction.cooldown) return null; // still recovering
+  if (parent.grain < t || (needsFruit && parent.fruit < t)) return null;
+
+  // Pick a random walkable neighbour (reservoir sampling again: no list needed).
+  let cx = -1, cy = -1, seen = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const x = parent.x + dx;
+      const y = parent.y + dy;
+      if (x < 0 || y < 0 || x >= world.width || y >= world.height) continue;
+      if (!isPassable(world, x, y)) continue;
+      seen++;
+      if (rng.int(seen) === 0) { cx = x; cy = y; }
+    }
+  }
+  if (seen === 0) return null;
+
+  const grain = parent.grain / 2;
+  const fruit = parent.fruit / 2;
+  parent.grain -= grain;
+  parent.fruit -= fruit;
+  parent.lastBirth = parent.age;
+  const genes = inheritGenes(parent.genes, rng, config);   // nature: copy + small mutation
+  const culture = copyCulture(parent.culture);            // nurture: learned from the parent
+  return createAgent({
+    id: childId, x: cx, y: cy, grain, fruit, genes, culture,
+    maxAge: rollLifespan(rng, config), parentId: parent.id,
+  });
 }

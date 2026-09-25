@@ -35,6 +35,15 @@ function updateMeter(now, stepsThisFrame) {
   }
 }
 
+// Average of each gene across living agents (read-only peek at sim state for the overlay).
+// Cheap enough per frame at ~1-2k agents; S6 moves this into yearly stats.
+function averageGenes(agents) {
+  const sum = { greed: 0, trust: 0, aggression: 0, memory: 0 };
+  for (const a of agents) for (const k in sum) sum[k] += a.genes[k];
+  const n = agents.length || 1;
+  return `genes greed ${(sum.greed / n).toFixed(2)} trust ${(sum.trust / n).toFixed(2)} aggr ${(sum.aggression / n).toFixed(2)} mem ${(sum.memory / n).toFixed(2)}`;
+}
+
 // ---------- The fixed-timestep loop ----------
 // Real time pours into a bucket (`acc`). We scoop it out in fixed-size chunks,
 // one tick per chunk, so the sim always moves in identical steps whatever the FPS.
@@ -67,7 +76,9 @@ function frame(now) {
     `tick  ${state.tick}`,
     `year  ${state.season.year}  ${state.season.name}`,
     `grow  grain x${state.season.grainFactor.toFixed(2)}  fruit x${state.season.fruitFactor.toFixed(2)}`,
-    `alive ${state.agents.length}`,
+    `alive ${state.agents.length}  (cap ${config.reproduction.maxPopulation})`,
+    `born  ${state.births}   died: starved ${state.deaths.starved}  old age ${state.deaths.oldAge}`,
+    averageGenes(state.agents),
     `seed  ${config.seed}`,
   ]);
 
