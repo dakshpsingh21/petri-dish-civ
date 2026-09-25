@@ -8,6 +8,7 @@ import { createAgent, rollLifespan, growOlder, moveTowardFood, eat, metabolize, 
 import { randomGenes, varyGenes, neutralCulture, geneDistance } from './genes.js';
 import { createBus } from './events.js';
 import { createTribes, foundTribe, updatePopulations } from './tribes.js';
+import { findNeighborsNaive } from './neighbors.js';
 
 // Build a brand-new world from config. Reset = call this again.
 // `bus` is passed IN, so listeners (main.js, tests) can subscribe BEFORE the
@@ -16,7 +17,8 @@ export function createSim(config, width, height, bus = createBus()) {
   const rng = createRng(hashString(config.seed));
   const world = createWorld(width, height, rng, config);
   const state = { tick: 0, rng, world, bus, agents: [], nextAgentId: 1, season: null,
-    tribes: createTribes(), births: 0, deaths: { starved: 0, oldAge: 0 } };
+    tribes: createTribes(), births: 0, deaths: { starved: 0, oldAge: 0 },
+    contacts: { agents: 0, pairs: 0 } };
   updateSeason(state, config);
 
   // Starting tribes: each gets a random home on land and its own random "base" genes.
@@ -94,14 +96,36 @@ export function step(state, config) {
     else state.deaths[agent.diedOf]++;
   }
 
-  // 4. Births. After everyone has eaten, so "well fed" means well fed THIS tick.
+  // 4. Meetings: who ended up next to whom, AFTER everyone has moved.
+  //    For now we only count them; share / trade / steal plug in here next (S4 steps 2-3).
+  if (config.features.interactions) meet(state, config);
+
+  // 5. Births. After everyone has eaten, so "well fed" means well fed THIS tick.
   if (config.features.reproduction) reproduce(state, config, living);
 
-  // 5. Clear out the dead, then recount tribes (and announce any that died out).
+  // 6. Clear out the dead, then recount tribes (and announce any that died out).
   removeDead(state.agents);
   updatePopulations(state.tribes, state.agents, state.tick, state.bus);
 
   state.tick++;
+}
+
+// Scratch list, reused for every agent every tick (never kept between calls).
+const nearby = [];
+
+// For every living agent, find its neighbours and count contacts.
+// contacts.agents = agents with at least one neighbour; contacts.pairs = sum of neighbour
+// counts (each pair counted twice, once from each side). Tells us how crowded the world is.
+function meet(state, config) {
+  let agents = 0, pairs = 0;
+  for (const agent of state.agents) {
+    if (!agent.alive) continue;
+    findNeighborsNaive(state.agents, agent, config.society.radius, nearby);
+    if (nearby.length > 0) agents++;
+    pairs += nearby.length;
+  }
+  state.contacts.agents = agents;
+  state.contacts.pairs = pairs;
 }
 
 // Every living, well-fed agent may have ONE child per tick, until the population cap.

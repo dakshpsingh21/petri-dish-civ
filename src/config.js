@@ -19,6 +19,7 @@ export const config = {
     mutation: true,     // false = children are exact gene clones of their parent
     aging: true,        // false = nobody dies of old age, metabolism stays flat
     tribeSplits: true,  // false = the starting tribes are the only tribes ever
+    interactions: true, // false = agents never meet (no neighbour search, no share/trade/steal)
   },
 
   // Terrain generation (becomes New World setup sliders in S8).
@@ -81,6 +82,11 @@ export const config = {
     // Self-limiting: every split resets the reference for that line (mean distance holds ~0.19).
     // Must stay above the max founder spread (sqrt(4) x 0.15 = 0.3) or founders would count as splits.
     splitThreshold: 0.35,
+  },
+
+  // Society (S4): agents meet neighbours, then share, trade or steal.
+  society: {
+    radius: 1,            // how far away (in cells) counts as "next to me". 1 = my cell + the 8 around it
   },
 
   reproduction: {

@@ -32,16 +32,20 @@ resize();
 const renderer = createRenderer(canvas, state.world);
 
 // ---------- Measuring (for the overlay) ----------
-const meter = { fps: 0, tps: 0, frames: 0, ticks: 0, since: performance.now() };
+// simMs = time spent inside step() only (not drawing), so ms/tick measures the SIM's cost.
+const meter = { fps: 0, tps: 0, msPerTick: 0, frames: 0, ticks: 0, simMs: 0, since: performance.now() };
 
-function updateMeter(now, stepsThisFrame) {
+function updateMeter(now, stepsThisFrame, simMs) {
   meter.frames++;
   meter.ticks += stepsThisFrame;
+  meter.simMs += simMs;
   if (now - meter.since >= 1000) {          // once per second, publish the counts
     meter.fps = meter.frames;
     meter.tps = meter.ticks;
+    meter.msPerTick = meter.ticks > 0 ? meter.simMs / meter.ticks : 0;
     meter.frames = 0;
     meter.ticks = 0;
+    meter.simMs = 0;
     meter.since = now;
   }
 }
@@ -78,6 +82,7 @@ function frame(now) {
   // 2. Scoop out whole ticks.
   const stepMs = 1000 / config.ticksPerSecond;
   let steps = 0;
+  const simStart = performance.now();
   while (acc >= stepMs && steps < MAX_STEPS_PER_FRAME) {
     step(state, config);
     acc -= stepMs;
@@ -86,16 +91,19 @@ function frame(now) {
   // Hit the cap? The machine can't keep up: drop the backlog so the sim slows
   // down gracefully instead of freezing (the "spiral of death").
   if (steps === MAX_STEPS_PER_FRAME) acc = 0;
+  const simMs = performance.now() - simStart;
 
   // 3. Draw once, no matter how many ticks ran.
-  updateMeter(now, steps);
+  updateMeter(now, steps, simMs);
   renderer.render(state, config, [
     `FPS   ${meter.fps}`,
     `TPS   ${meter.tps}  (target ${config.ticksPerSecond})`,
+    `sim   ${meter.msPerTick.toFixed(2)} ms/tick  (budget 8)`,
     `tick  ${state.tick}`,
     `year  ${state.season.year}  ${state.season.name}`,
     `grow  grain x${state.season.grainFactor.toFixed(2)}  fruit x${state.season.fruitFactor.toFixed(2)}`,
     `alive ${state.agents.length}  (cap ${config.reproduction.maxPopulation})`,
+    `meet  ${state.contacts.agents} agents have a neighbour  (avg ${(state.contacts.pairs / (state.agents.length || 1)).toFixed(1)} each)`,
     `born  ${state.births}   died: starved ${state.deaths.starved}  old age ${state.deaths.oldAge}`,
     averageGenes(state.agents),
     tribeSummary(state.tribes),

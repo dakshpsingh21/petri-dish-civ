@@ -26,6 +26,12 @@
     import { GENE_NAMES, inheritGenes, copyCulture, neutralCulture, geneDistance } from './src/genes.js';
     import { metabolize } from './src/agent.js';
     import { createBus } from './src/events.js';
+    import { findNeighborsNaive } from './src/neighbors.js';
+
+    // The naive O(n^2) neighbour search makes the long tests below take MINUTES (~25k ticks).
+    // They test other mechanics, so they run with it off. The society tests switch it on
+    // in their own config copy. Revisit in S12 once the spatial hash makes it cheap.
+    config.features.interactions = false;
 
     const list = document.getElementById('results');
     function test(name, fn) {
@@ -202,6 +208,33 @@
     test('tribes: same seed -> same names', () => {
       const names = () => [...createSim(config, WORLD_WIDTH, WORLD_HEIGHT).tribes.byId.values()].map(t => t.name).join(',');
       assert(names() === names(), 'names differ');
+    });
+
+    // ---------- neighbors.js ----------
+    test('neighbours: radius 1 = the 3x3 square; skips self and the dead', () => {
+      const me = { x: 5, y: 5, alive: true };
+      const diag = { x: 6, y: 6, alive: true };    // diagonal: counts
+      const far = { x: 7, y: 5, alive: true };     // 2 cells away
+      const dead = { x: 5, y: 4, alive: false };   // adjacent but dead
+      const agents = [me, diag, far, dead];
+      const out = [];
+      assert(sameArray(findNeighborsNaive(agents, me, 1, out), [diag]), 'radius 1');
+      assert(sameArray(findNeighborsNaive(agents, me, 2, out), [diag, far]), 'radius 2');
+      // radius 0 = my own cell only; nobody shares it -> [] (proves `out` is cleared between calls)
+      assert(findNeighborsNaive(agents, me, 0, out).length === 0, 'out must be cleared between calls');
+    });
+    test('neighbours: meeting only counts for now, so history is the same with it on or off (300 ticks)', () => {
+      const run = (on) => {
+        const c = structuredClone(config);
+        c.features.interactions = on;
+        const s = createSim(c, WORLD_WIDTH, WORLD_HEIGHT);
+        for (let t = 0; t < 300; t++) step(s, c);
+        return { key: s.agents.map(a => `${a.id}:${a.x},${a.y}:${a.grain}`).join('|'), contacts: s.contacts };
+      };
+      const off = run(false), on = run(true);
+      assert(off.key === on.key, 'history changed');
+      assert(on.contacts.agents > 0, 'nobody ever met anyone');
+      assert(on.contacts.pairs % 2 === 0, 'pairs are counted from both sides, so must be even');
     });
 
     // ---------- world.js terrain ----------
