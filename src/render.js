@@ -10,6 +10,7 @@
 
 import { WATER, PLAINS, FOREST, HILLS, MOUNTAIN } from './world.js';
 import { createAgentPainter } from './renderAgents.js';
+import { createFxPainter } from './renderFx.js';
 
 const BG = '#10141c';
 
@@ -44,6 +45,7 @@ export function createRenderer(canvas, world) {
   const trailLayer = makeLayer(world);   // we draw on this one with normal canvas calls, not pixels
 
   const drawAgents = createAgentPainter(ctx);
+  const drawFx = createFxPainter(ctx);
 
   paintTerrain(terrainLayer, world);   // once, up front
 
@@ -125,6 +127,7 @@ export function createRenderer(canvas, world) {
       drawLayer(trailLayer, view);
     }
     drawAgents(view, state, config);
+    if (config.view.flashes) drawFx(view, state.fx, config);   // on top of agents
     drawOverlay(overlayLines);
   }
 

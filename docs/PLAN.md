@@ -51,10 +51,10 @@
 ## S4: Society 🤝
 **Goal:** neighbors share, trade or steal, and remember who did what.
 - [x] 1. Naive neighbor finding (O(n²), **on purpose**). Record a baseline ms/tick at 500 / 1k / 2k / 5k agents in HANDOVER.
-- [ ] 2. `rules.js`: `decide(agent, other, context)` → `'SHARE' | 'TRADE' | 'STEAL'` as a **pure function**, using need (trade when I lack what you have), effective traits and reputation. Add `console.assert` tests.
-- [ ] 3. Apply outcomes: share = give some surplus; trade = swap surplus for need (**both** end up better off); steal = take from their bigger store (success depends on aggression).
-- [ ] 4. Memory: `Map` used as an LRU capped at `memorySize`. Reputation updates after every interaction; betrayal (stealing from someone who trusted you) = big penalty.
-- [ ] 5. Tribe relation tallies (trades / shares / steals / betrayals per tribe pair per year).
+- [x] 2. `rules.js`: `decide(agent, other, context)` → `'SHARE' | 'TRADE' | 'STEAL'` as a **pure function**, using need (trade when I lack what you have), effective traits and reputation. Add `console.assert` tests.
+- [x] 3. Apply outcomes: share = give some surplus; trade = swap surplus for need (**both** end up better off); steal = take from their bigger store (success depends on aggression).
+- [x] 4. Memory: `Map` used as an LRU capped at `memorySize`. Reputation updates after every interaction; betrayal (stealing from someone who trusted you) = big penalty.
+- [x] 5. Tribe relation tallies (trades / shares / steals / betrayals per tribe pair per year).
 - [ ] 6. `fx.js` + **event flashes**: steal spark, trade pulse, death ripple. Sampled, capped, never uses the RNG.
 
 **Files:** `rules.js`, `agent.js`, `sim.js`, `tribes.js`, `fx.js`, `render.js`, `tests.html`
@@ -181,6 +181,8 @@
 *(Add with a date. Pick up only after S14, or if Daksh explicitly swaps one into a session.)*
 - Terrain painting brush (raise mountains, dig lakes mid-run)
 - (2026-09-25) Tribe cohesion: agents lean toward tribe-mates when moving, so tribes hold territory (right now tribes fully mix by ~year 10). Check first whether S4 interactions already cause it.
+- (2026-09-25) Failed theft = a fight: the thief loses food. Backup plan if S5 gossip doesn't stop aggression taking over (see HANDOVER S4 findings).
+- (2026-09-25) Nudge trade (it's ~2% of decisions): e.g. agents at plains/forest borders, or travellers seeking trade partners. Look again before S11's trade-network lines.
 - Replay: put the command log in the share link so edits replay exactly (easy thanks to the command queue)
 - Tribe family-tree view
 - Export the History Book as an image / text

@@ -5,7 +5,7 @@ import { config, MAX_STEPS_PER_FRAME, MAX_FRAME_MS, WORLD_WIDTH, WORLD_HEIGHT } 
 import { createSim, step } from './sim.js';
 import { createRenderer } from './render.js';
 import { createBus } from './events.js';
-import { livingTribes } from './tribes.js';
+import { livingTribes, topRelations } from './tribes.js';
 
 const canvas = document.getElementById('world');
 
@@ -16,6 +16,11 @@ bus.on('tribe:founded', e => console.log(e.parentName
   ? `[tick ${e.tick}] The ${e.name} split off from the ${e.parentName}.`
   : `[tick ${e.tick}] The ${e.name} are founded.`));
 bus.on('tribe:extinct', e => console.log(`[tick ${e.tick}] The ${e.name} have died out.`));
+// Each year: the 5 busiest tribe pairs (actor -> target). `state` exists by then (no year ends at tick 0).
+bus.on('year:end', e => {
+  console.log(`--- Year ${e.year}: busiest tribe relations ---`);
+  console.table(topRelations(state.tribes, state.tribes.relations.lastYear, 5));
+});
 
 const state = createSim(config, WORLD_WIDTH, WORLD_HEIGHT, bus);
 
@@ -104,6 +109,7 @@ function frame(now) {
     `grow  grain x${state.season.grainFactor.toFixed(2)}  fruit x${state.season.fruitFactor.toFixed(2)}`,
     `alive ${state.agents.length}  (cap ${config.reproduction.maxPopulation})`,
     `meet  ${state.contacts.agents} agents have a neighbour  (avg ${(state.contacts.pairs / (state.agents.length || 1)).toFixed(1)} each)`,
+    `acts  trades ${state.interactions.trades}  shares ${state.interactions.shares}  steals ${state.interactions.steals} (+${state.interactions.failedSteals} failed)  betrayals ${state.interactions.betrayals}`,
     `born  ${state.births}   died: starved ${state.deaths.starved}  old age ${state.deaths.oldAge}`,
     averageGenes(state.agents),
     tribeSummary(state.tribes),

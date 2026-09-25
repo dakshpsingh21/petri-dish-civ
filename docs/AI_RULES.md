@@ -49,7 +49,7 @@ In mode B, use a **hint ladder** and only climb when he's stuck or asks:
 - Small, focused files (aim for < ~150 lines; flag anything over 200).
 - Clear names. `camelCase` for variables/functions, `UPPER_SNAKE` for constants in `config.js`.
 - Comments explain *why*, not *what*, and go wherever the logic isn't obvious.
-- **Sim code (`sim.js`, `world.js`, `noise.js`, `agent.js`, `genes.js`, `events.js`, `rules.js`, `minds.js`, `tribes.js`, `nature.js`, `commands.js`, `fx.js`, `chronicle.js`, `templates.js`, `stats.js`, `spatialHash.js`) never touches the DOM** and never calls `Math.random()`, `Date.now()` or `performance.now()`. Use `rng.js`.
+- **Sim code (`sim.js`, `world.js`, `noise.js`, `agent.js`, `genes.js`, `events.js`, `rules.js`, `neighbors.js`, `society.js`, `minds.js`, `tribes.js`, `nature.js`, `commands.js`, `fx.js`, `chronicle.js`, `templates.js`, `stats.js`, `spatialHash.js`) never touches the DOM** and never calls `Math.random()`, `Date.now()` or `performance.now()`. Use `rng.js`.
 - **UI never edits sim state directly.** Every god action or knob change goes through `commands.js` and is applied at the start of the next tick.
 - **Every new mechanic gets a feature flag + its knobs in `config.js`**, and shows up in the UI (live controls, and the setup screen where it makes sense). Add mechanics one at a time and tune each before starting the next.
 - `fx.js` and rendering must never call the RNG (so visuals can't change history).

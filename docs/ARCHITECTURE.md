@@ -42,6 +42,8 @@ petri-dish-civ/
 ├── index.html  style.css  README.md
 ├── docs/                 # PRD, ARCHITECTURE, PLAN, HANDOVER, AI_RULES, (FINDINGS)
 ├── tests.html            # tiny no-dependency test page (console.assert)
+├── package.json          # only "type": "module" for Node (no dependencies)
+├── tools/bench.mjs       # headless ms/tick benchmark (S4 baseline, S12 before/after)
 ├── experiments.html      # headless experiment runner (S13)
 ├── assets/               # demo.gif
 └── src/
@@ -55,7 +57,9 @@ petri-dish-civ/
     ├── world.js          # terrain, grain/fruit grids, regrowth, seasons, regions
     ├── agent.js          # create, move, eat, metabolism, aging, reproduce
     ├── genes.js          # genes + culture: random, vary/mutate, inherit, distance, effective trait
-    ├── rules.js          # decide SHARE / TRADE / STEAL + apply outcome (pure-ish)
+    ├── neighbors.js      # naive O(n^2) "who is near me?" (S4 baseline; replaced by spatialHash in S12)
+    ├── society.js        # the meetings phase: pick neighbour -> decide -> apply -> tallies -> memory -> fx
+    ├── rules.js          # decide TRADE / SHARE / STEAL / IGNORE (pure) + apply outcome
     ├── minds.js          # memory, tribe opinions, gossip, learned trust, culture, defection
     ├── tribes.js         # registry, names/hues, relations, centroids, moods/raids
     ├── nature.js         # drought, harvest, plague, nature mode
@@ -66,6 +70,7 @@ petri-dish-civ/
     ├── templates.js      # entries → sentences
     ├── render.js         # draws the layers (§9) under the camera transform
     ├── renderAgents.js   # agent layer: tribe colour, size = food, dark = old, edges (grouped by colour)
+    ├── renderFx.js       # draws + ages fx flashes (rings, sparks, ripples)
     └── ui/
         ├── controls.js   # grouped knobs, flags, layer toggles, disaster buttons
         ├── setup.js      # New World screen + presets + share link

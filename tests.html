@@ -26,8 +26,11 @@
     import { GENE_NAMES, inheritGenes, copyCulture, neutralCulture, geneDistance } from './src/genes.js';
     import { metabolize } from './src/agent.js';
     import { createBus } from './src/events.js';
+    import { createFx, pushFx } from './src/fx.js';
+    import { tallyRelation, startRelationsYear, createTribes } from './src/tribes.js';
     import { findNeighborsNaive } from './src/neighbors.js';
-    import { decide } from './src/rules.js';
+    import { decide, apply } from './src/rules.js';
+    import { memoryCapacity, recall, remember, updateReputation } from './src/minds.js';
 
     // The naive O(n^2) neighbour search makes the long tests below take MINUTES (~25k ticks).
     // They test other mechanics, so they run with it off. The society tests switch it on
@@ -224,18 +227,59 @@
       // radius 0 = my own cell only; nobody shares it -> [] (proves `out` is cleared between calls)
       assert(findNeighborsNaive(agents, me, 0, out).length === 0, 'out must be cleared between calls');
     });
-    test('neighbours: meeting only counts for now, so history is the same with it on or off (300 ticks)', () => {
-      const run = (on) => {
+    test('society: interactions ON -> same seed still gives the same history (300 ticks)', () => {
+      const run = () => {
         const c = structuredClone(config);
-        c.features.interactions = on;
+        c.features.interactions = true;
         const s = createSim(c, WORLD_WIDTH, WORLD_HEIGHT);
         for (let t = 0; t < 300; t++) step(s, c);
-        return { key: s.agents.map(a => `${a.id}:${a.x},${a.y}:${a.grain}`).join('|'), contacts: s.contacts };
+        return { key: s.agents.map(a => `${a.id}:${a.x},${a.y}:${a.grain}:${a.fruit}`).join('|'), acts: s.interactions };
       };
-      const off = run(false), on = run(true);
-      assert(off.key === on.key, 'history changed');
-      assert(on.contacts.agents > 0, 'nobody ever met anyone');
-      assert(on.contacts.pairs % 2 === 0, 'pairs are counted from both sides, so must be even');
+      const a = run(), b = run();
+      assert(a.key === b.key, 'two runs diverged');
+      assert(a.acts.trades + a.acts.shares + a.acts.steals > 0, 'nobody ever did anything');
+    });
+
+    test('relations: tallies are directed and roll over each year', () => {
+      const tribes = createTribes();
+      tallyRelation(tribes, 1, 2, 'steals');
+      tallyRelation(tribes, 1, 2, 'steals');
+      tallyRelation(tribes, 2, 1, 'trades');
+      const y = tribes.relations.thisYear;
+      assert(y.get(1).get(2).steals === 2 && y.get(2).get(1).steals === 0, 'A->B and B->A must differ');
+      startRelationsYear(tribes);
+      assert(tribes.relations.lastYear.get(1).get(2).steals === 2, 'lastYear lost the tally');
+      assert(tribes.relations.thisYear.size === 0, 'new year should start empty');
+    });
+    test('relations: tribe tallies add up to the world totals (300 ticks)', () => {
+      const c = structuredClone(config);
+      c.features.interactions = true;
+      const s = createSim(c, WORLD_WIDTH, WORLD_HEIGHT);
+      for (let t = 0; t < 300; t++) step(s, c);
+      const sum = { trades: 0, shares: 0, steals: 0, failedSteals: 0, betrayals: 0 };
+      for (const row of s.tribes.relations.thisYear.values()) {
+        for (const tally of row.values()) for (const k in sum) sum[k] += tally[k];
+      }
+      for (const k in sum) assert(sum[k] === s.interactions[k], `${k}: tribes ${sum[k]} vs world ${s.interactions[k]}`);
+    });
+
+    // ---------- fx.js ----------
+    test('fx: keeps 1 in N events, and the ring overwrites the oldest when full', () => {
+      const fx = createFx(2);
+      for (let i = 0; i < 6; i++) pushFx(fx, 0, i, 0, 2);   // keeps events 0, 2, 4
+      // capacity 2: event 0 went in slot 0, event 2 in slot 1, event 4 overwrote slot 0
+      assert(fx.x[0] === 4 && fx.x[1] === 2, `slots hold x ${fx.x[0]}, ${fx.x[1]}`);
+    });
+    test('fx: flashes on or off -> identical history (visuals never change the sim, 300 ticks)', () => {
+      const run = (flashes) => {
+        const c = structuredClone(config);
+        c.features.interactions = true;
+        c.view.flashes = flashes;
+        const s = createSim(c, WORLD_WIDTH, WORLD_HEIGHT);
+        for (let t = 0; t < 300; t++) step(s, c);
+        return s.agents.map(a => `${a.id}:${a.x},${a.y}:${a.grain}:${a.fruit}`).join('|');
+      };
+      assert(run(true) === run(false), 'flashes changed history');
     });
 
     // ---------- rules.js decide() ----------
@@ -271,6 +315,79 @@
       const before = JSON.stringify([a, b]);
       assert(decide(a, b, meeting(0.2)) === decide(a, b, meeting(0.2)), 'answers differ');
       assert(JSON.stringify([a, b]) === before, 'decide() changed its inputs');
+    });
+
+    // ---------- rules.js apply() ----------
+    const always = { next: () => 0 };      // fake rng: every roll succeeds
+    const never = { next: () => 0.999 };   // fake rng: every roll fails (unless chance is 1)
+    const total = (...xs) => xs.reduce((sum, a) => sum + a.grain + a.fruit, 0);
+    test('apply: every action conserves food (moved, never created)', () => {
+      for (const action of ['SHARE', 'TRADE', 'STEAL', 'IGNORE']) {
+        const a = mk(18, 2), b = mk(2, 18);
+        const before = total(a, b);
+        apply(action, a, b, always, config);
+        assert(Math.abs(total(a, b) - before) < 1e-9, `${action} changed total food`);
+      }
+    });
+    test('apply: a trade leaves BOTH with a bigger smallest store', () => {
+      const a = mk(18, 2), b = mk(3, 17);
+      apply('TRADE', a, b, always, config);
+      assert(Math.min(a.grain, a.fruit) > 2 && Math.min(b.grain, b.fruit) > 3, `a ${a.grain}/${a.fruit} b ${b.grain}/${b.fruit}`);
+    });
+    test('apply: share never leaves the giver poorer than the receiver', () => {
+      const a = mk(10, 10), b = mk(9, 9);
+      apply('SHARE', a, b, always, config);
+      assert(a.grain >= b.grain && a.fruit >= b.fruit, `a ${a.grain}/${a.fruit} b ${b.grain}/${b.fruit}`);
+    });
+    test('apply: failed steal moves nothing; a sure-thing thief (aggr 1 vs 0) always wins', () => {
+      const a = mk(2, 2), b = mk(18, 18);
+      assert(apply('STEAL', a, b, never, config) === 0 && a.grain === 2, 'failed steal moved food');
+      const thief = mk(2, 2, { aggression: 1 }), victim = mk(18, 18, { aggression: 0 });
+      assert(apply('STEAL', thief, victim, never, config) > 0, 'chance 1 should always succeed');
+    });
+    test('apply: a victim who knows you (guard 1) blocks even a sure-thing thief', () => {
+      const c = structuredClone(config);
+      c.society.guardWeight = 1;
+      const thief = mk(2, 2, { aggression: 1 }), victim = mk(18, 18, { aggression: 0 });
+      const coin = { next: () => 0.5 };
+      assert(apply('STEAL', thief, victim, coin, c, 0) > 0, 'stranger victim: should succeed');
+      assert(apply('STEAL', thief, victim, coin, c, 1) === 0, 'guarded victim: should fail');
+    });
+
+    // ---------- minds.js memory ----------
+    const person = (id, memoryGene) => ({ id, memory: new Map(), genes: { memory: memoryGene } });
+    test('memory: capacity follows the memory gene (0 -> min, 1 -> max)', () => {
+      assert(memoryCapacity(person(1, 0), config) === config.society.memoryMin, 'gene 0');
+      assert(memoryCapacity(person(1, 1), config) === config.society.memoryMax, 'gene 1');
+    });
+    test('memory: LRU forgets the least recently USED, not the oldest added', () => {
+      const c = structuredClone(config);
+      c.society.memoryMin = 3; c.society.memoryMax = 3;     // capacity exactly 3
+      const me = person(1, 0);
+      remember(me, 10, 0.1, c); remember(me, 20, 0.1, c); remember(me, 30, 0.1, c);
+      recall(me, 10);                                        // 10 is now the most recent
+      remember(me, 40, 0.1, c);                              // over capacity -> forget one
+      assert(sameArray([...me.memory.keys()], [30, 10, 40]) , `kept [${[...me.memory.keys()]}]`);
+    });
+    test('memory: strangers are 0, reputation stays within -1..+1', () => {
+      const me = person(1, 1);
+      assert(recall(me, 99) === 0, 'stranger should be 0');
+      for (let i = 0; i < 10; i++) remember(me, 5, -0.5, config);
+      assert(recall(me, 5) === -1, `got ${recall(me, 5)}`);
+    });
+    test('memory: stealing from a friend is a betrayal (3x penalty); from a stranger it is not', () => {
+      const thief = person(1, 1), friend = person(2, 1), stranger = person(3, 1);
+      remember(friend, 1, 0.5, config);                      // friend likes the thief
+      assert(updateReputation('STEAL', thief, friend, config) === true, 'should be a betrayal');
+      const expected = 0.5 - config.society.repSteal * config.society.betrayalMultiplier;
+      assert(Math.abs(recall(friend, 1) - expected) < 1e-9, `friend now ${recall(friend, 1)}`);
+      assert(updateReputation('STEAL', thief, stranger, config) === false, 'stranger: no betrayal');
+      assert(Math.abs(recall(stranger, 1) + config.society.repSteal) < 1e-9, `stranger now ${recall(stranger, 1)}`);
+    });
+    test('memory: a trade makes both sides like each other', () => {
+      const a = person(1, 1), b = person(2, 1);
+      updateReputation('TRADE', a, b, config);
+      assert(recall(a, 2) > 0 && recall(b, 1) > 0, 'both should be positive');
     });
 
     // ---------- world.js terrain ----------

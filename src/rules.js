@@ -65,3 +65,55 @@ export function decide(agent, other, context) {
   if (steal > bestScore) { best = 'STEAL'; bestScore = steal; }
   return best;
 }
+
+// ---------- apply(): make the decision happen ----------
+// Food only MOVES between the two agents, it is never created or destroyed (same rule as
+// births). Every amount is capped at HALF THE GAP between them, so the giver never ends up
+// poorer than the receiver, and a victim can never be robbed down to 0.
+// Returns how much food moved (0 = nothing happened, e.g. a failed theft).
+// guard (0..1): how much `other` distrusts `agent` (0 = stranger/friend, 1 = known thief).
+// Passed in by the caller so rules.js doesn't need to know how memory works.
+
+// Most `from` can hand `to` of resource r: the knob, half the gap, and the room `to` has left.
+function transferable(from, to, r, amount, maxStore) {
+  return Math.max(0, Math.min(amount, (from[r] - to[r]) / 2, maxStore - to[r]));
+}
+
+export function apply(action, agent, other, rng, config, guard = 0) {
+  const { maxStore, society } = config;
+  const iNeed = mostNeeded(hunger(agent, maxStore));
+  const theyNeed = mostNeeded(hunger(other, maxStore));
+
+  if (action === 'SHARE') {
+    const n = transferable(agent, other, theyNeed, society.shareAmount, maxStore);
+    agent[theyNeed] -= n;
+    other[theyNeed] += n;
+    return n;
+  }
+
+  if (action === 'TRADE') {
+    // Equal swap: I give what they lack, they give what I lack. Limited by BOTH directions.
+    const n = Math.min(
+      transferable(agent, other, theyNeed, society.tradeAmount, maxStore),
+      transferable(other, agent, iNeed, society.tradeAmount, maxStore));
+    agent[theyNeed] -= n; other[theyNeed] += n;
+    other[iNeed] -= n;    agent[iNeed] += n;
+    return n;
+  }
+
+  if (action === 'STEAL') {
+    // Success depends on who is fiercer: equal aggression = coin flip, 1 vs 0 = sure thing.
+    // A victim who KNOWS you're a thief guards their stores: chance drops by guardWeight x guard.
+    // This is what makes a bad reputation cost the thief something.
+    // ALWAYS one rng call, success or not, so the RNG sequence doesn't depend on the outcome.
+    const fierceness = 0.5 + 0.5 * (effectiveTrait(agent, 'aggression') - effectiveTrait(other, 'aggression'));
+    const chance = clamp01(fierceness - society.guardWeight * guard);
+    if (rng.next() >= chance) return 0;
+    const n = transferable(other, agent, iNeed, society.stealAmount, maxStore);
+    other[iNeed] -= n;
+    agent[iNeed] += n;
+    return n;
+  }
+
+  return 0;   // IGNORE
+}

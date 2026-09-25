@@ -7,8 +7,10 @@ import { createWorld, regrow, isPassable, yearFraction, seasonName, seasonFactor
 import { createAgent, rollLifespan, growOlder, moveTowardFood, eat, metabolize, tryReproduce } from './agent.js';
 import { randomGenes, varyGenes, neutralCulture, geneDistance } from './genes.js';
 import { createBus } from './events.js';
-import { createTribes, foundTribe, updatePopulations } from './tribes.js';
-import { findNeighborsNaive } from './neighbors.js';
+import { createTribes, foundTribe, updatePopulations, startRelationsYear } from './tribes.js';
+import { meet } from './society.js';
+import { createFx, pushFx, FX_DEATH } from './fx.js';
+import { FX_CAPACITY } from './config.js';
 
 // Build a brand-new world from config. Reset = call this again.
 // `bus` is passed IN, so listeners (main.js, tests) can subscribe BEFORE the
@@ -18,7 +20,7 @@ export function createSim(config, width, height, bus = createBus()) {
   const world = createWorld(width, height, rng, config);
   const state = { tick: 0, rng, world, bus, agents: [], nextAgentId: 1, season: null,
     tribes: createTribes(), births: 0, deaths: { starved: 0, oldAge: 0 },
-    contacts: { agents: 0, pairs: 0 } };
+    contacts: { agents: 0, pairs: 0 }, fx: createFx(FX_CAPACITY), interactions: { trades: 0, shares: 0, steals: 0, failedSteals: 0, betrayals: 0 } };
   updateSeason(state, config);
 
   // Starting tribes: each gets a random home on land and its own random "base" genes.
@@ -93,11 +95,13 @@ export function step(state, config) {
       metabolize(agent, config);
     }
     if (agent.alive) living++;
-    else state.deaths[agent.diedOf]++;
+    else {
+      state.deaths[agent.diedOf]++;
+      if (config.view.flashes) pushFx(state.fx, FX_DEATH, agent.x, agent.y, config.view.fxEvery.death);
+    }
   }
 
-  // 4. Meetings: who ended up next to whom, AFTER everyone has moved.
-  //    For now we only count them; share / trade / steal plug in here next (S4 steps 2-3).
+  // 4. Meetings: everyone who ended up next to someone may share, trade or steal (society.js).
   if (config.features.interactions) meet(state, config);
 
   // 5. Births. After everyone has eaten, so "well fed" means well fed THIS tick.
@@ -108,24 +112,12 @@ export function step(state, config) {
   updatePopulations(state.tribes, state.agents, state.tick, state.bus);
 
   state.tick++;
-}
 
-// Scratch list, reused for every agent every tick (never kept between calls).
-const nearby = [];
-
-// For every living agent, find its neighbours and count contacts.
-// contacts.agents = agents with at least one neighbour; contacts.pairs = sum of neighbour
-// counts (each pair counted twice, once from each side). Tells us how crowded the world is.
-function meet(state, config) {
-  let agents = 0, pairs = 0;
-  for (const agent of state.agents) {
-    if (!agent.alive) continue;
-    findNeighborsNaive(state.agents, agent, config.society.radius, nearby);
-    if (nearby.length > 0) agents++;
-    pairs += nearby.length;
+  // 7. Year boundary: close this year's tribe tallies and tell listeners (console now, stats later).
+  if (state.tick % config.ticksPerYear === 0) {
+    startRelationsYear(state.tribes);
+    state.bus.emit('year:end', { tick: state.tick, year: state.tick / config.ticksPerYear });
   }
-  state.contacts.agents = agents;
-  state.contacts.pairs = pairs;
 }
 
 // Every living, well-fed agent may have ONE child per tick, until the population cap.

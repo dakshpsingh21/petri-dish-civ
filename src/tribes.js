@@ -9,7 +9,8 @@ const SYLLABLES = ['ka', 'ru', 'vel', 'mi', 'to', 'sha', 'dor', 'an', 'el', 'ish
 const GOLDEN_ANGLE = 137.508;
 
 export function createTribes() {
-  return { byId: new Map(), nextId: 1, usedNames: new Set() };
+  return { byId: new Map(), nextId: 1, usedNames: new Set(),
+    relations: { thisYear: new Map(), lastYear: new Map() } };
 }
 
 // 2-3 seeded syllables, capitalised: "Karuvel", "Mito", "Shadoran".
@@ -63,4 +64,41 @@ export function updatePopulations(tribes, agents, tick, bus) {
 
 export function livingTribes(tribes) {
   return [...tribes.byId.values()].filter(t => t.extinctTick === null);
+}
+
+// ---------- Relations: which tribe did what to which, this year ----------
+// relations.thisYear: Map actorTribeId -> Map targetTribeId -> tally.
+// DIRECTED: "A robbed B" and "B robbed A" are different facts (the History Book needs both).
+// Nested Maps instead of "3>7" string keys, so counting never builds a new string per interaction.
+// Same-tribe interactions are counted too (A -> A): theft inside a tribe is a story as well.
+function newTally() {
+  return { trades: 0, shares: 0, steals: 0, failedSteals: 0, betrayals: 0 };
+}
+
+// field = 'trades' | 'shares' | 'steals' | 'failedSteals' | 'betrayals'
+export function tallyRelation(tribes, actorTribeId, targetTribeId, field) {
+  const year = tribes.relations.thisYear;
+  let row = year.get(actorTribeId);
+  if (!row) { row = new Map(); year.set(actorTribeId, row); }
+  let tally = row.get(targetTribeId);
+  if (!tally) { tally = newTally(); row.set(targetTribeId, tally); }
+  tally[field]++;
+}
+
+// New year: this year's tallies become lastYear (read by the console now, charts + book later).
+export function startRelationsYear(tribes) {
+  tribes.relations.lastYear = tribes.relations.thisYear;
+  tribes.relations.thisYear = new Map();
+}
+
+// The n busiest tribe pairs in one year's tallies (for display; not on the per-tick hot path).
+export function topRelations(tribes, yearTallies, n) {
+  const rows = [];
+  for (const [actorId, row] of yearTallies) {
+    for (const [targetId, t] of row) {
+      rows.push({ actor: tribes.byId.get(actorId).name, target: tribes.byId.get(targetId).name,
+        ...t, total: t.trades + t.shares + t.steals + t.failedSteals });
+    }
+  }
+  return rows.sort((a, b) => b.total - a.total).slice(0, n);
 }

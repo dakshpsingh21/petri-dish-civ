@@ -4,6 +4,8 @@
 export const MAX_STEPS_PER_FRAME = 10; // max sim ticks per rendered frame (stops the "spiral of death")
 export const MAX_FRAME_MS = 250;       // ignore frame gaps bigger than this (e.g. tab was in background)
 
+export const FX_CAPACITY = 256;       // most flashes on screen at once (ring buffer, oldest overwritten)
+
 export const WORLD_WIDTH = 200;        // in cells (becomes a New World setup option in S8)
 export const WORLD_HEIGHT = 150;
 
@@ -38,6 +40,9 @@ export const config = {
     trails: true,       // agents leave fading trails -> migration routes and home ranges appear
     trailFade: 0.08,    // how much of each trail pixel's opacity is erased per frame
     aggressiveEdge: 0.7, // agents with effective aggression above this get a red edge
+    flashes: true,      // trade / share / steal / death flashes (fx.js); off = nothing recorded
+    fxLife: 30,         // frames a flash lasts (~0.5 s at 60fps)
+    fxEvery: { trade: 1, share: 4, steal: 8, death: 1 }, // draw 1 in N events (steals are ~70/tick)
   },
 
   ticksPerSecond: 20,   // sim speed: world-steps per real second (independent of screen refresh rate)
@@ -88,6 +93,16 @@ export const config = {
   society: {
     radius: 1,            // how far away (in cells) counts as "next to me". 1 = my cell + the 8 around it
     minScore: 0.1,        // an action's score (0..1) must beat this, else IGNORE (well-fed strangers just pass by)
+    shareAmount: 2,       // most food given in one SHARE
+    tradeAmount: 3,       // most food swapped EACH WAY in one TRADE
+    stealAmount: 3,       // most food taken in one successful STEAL
+    memoryMin: 2,         // agents remembered with memory gene 0
+    memoryMax: 20,        // ... and with memory gene 1 (LRU: forget the least recently used)
+    repTrade: 0.2,        // reputation change for BOTH sides of a trade
+    repShare: 0.3,        // receiver's opinion of the giver
+    repSteal: 0.3,        // victim's opinion of the thief drops by this (attempts count too)
+    betrayalMultiplier: 3, // stealing from someone who LIKED you: 3x the drop (-0.9)
+    guardWeight: 0.5,     // steal chance drops by this x victim's distrust (known thief at -1: -50%)
     reputationWeight: 0.5, // how much reputation (-1..+1) shifts warmth: 0.5 -> a cheater cuts my trust by up to 0.5
   },
 
