@@ -30,7 +30,7 @@
     import { tallyRelation, startRelationsYear, createTribes } from './src/tribes.js';
     import { findNeighborsNaive } from './src/neighbors.js';
     import { decide, apply } from './src/rules.js';
-    import { memoryCapacity, recall, remember, updateReputation } from './src/minds.js';
+    import { memoryCapacity, recall, remember, updateReputation, tribeOpinion, opinionOf } from './src/minds.js';
 
     // The naive O(n^2) neighbour search makes the long tests below take MINUTES (~25k ticks).
     // They test other mechanics, so they run with it off. The society tests switch it on
@@ -355,7 +355,7 @@
     });
 
     // ---------- minds.js memory ----------
-    const person = (id, memoryGene) => ({ id, memory: new Map(), genes: { memory: memoryGene } });
+    const person = (id, memoryGene, tribeId = 0) => ({ id, tribeId, memory: new Map(), tribeOpinions: new Map(), genes: { memory: memoryGene } });
     test('memory: capacity follows the memory gene (0 -> min, 1 -> max)', () => {
       assert(memoryCapacity(person(1, 0), config) === config.society.memoryMin, 'gene 0');
       assert(memoryCapacity(person(1, 1), config) === config.society.memoryMax, 'gene 1');
@@ -388,6 +388,24 @@
       const a = person(1, 1), b = person(2, 1);
       updateReputation('TRADE', a, b, config);
       assert(recall(a, 2) > 0 && recall(b, 1) > 0, 'both should be positive');
+    });
+
+    // ---------- minds.js tribe opinions (S5) ----------
+    test('tribe opinions: a theft sours the victim on the thief\'s whole tribe (smaller nudge)', () => {
+      const thief = person(1, 1, 7), victim = person(2, 1, 3);
+      updateReputation('STEAL', thief, victim, config);
+      const expected = -config.society.repSteal * config.minds.tribeOpinionRate;
+      assert(Math.abs(tribeOpinion(victim, 7) - expected) < 1e-9, `tribe 7 now ${tribeOpinion(victim, 7)}`);
+      assert(tribeOpinion(thief, 3) === 0, 'the thief learned nothing about the victim\'s tribe');
+    });
+    test('tribe opinions: strangers are judged by their tribe, known agents personally', () => {
+      const me = person(1, 1, 3), stranger = person(50, 1, 7), known = person(51, 1, 7);
+      me.tribeOpinions.set(7, -0.6);
+      remember(me, 51, 0.4, config);
+      assert(opinionOf(me, stranger, config) === -0.6, 'stranger should get the tribe opinion');
+      assert(Math.abs(opinionOf(me, known, config) - 0.4) < 1e-9, 'known agent: personal wins');
+      const off = structuredClone(config); off.features.tribeOpinions = false;
+      assert(opinionOf(me, stranger, off) === 0, 'flag off: stranger is 0 again');
     });
 
     // ---------- world.js terrain ----------

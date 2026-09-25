@@ -22,6 +22,7 @@ export const config = {
     aging: true,        // false = nobody dies of old age, metabolism stays flat
     tribeSplits: true,  // false = the starting tribes are the only tribes ever
     interactions: true, // false = agents never meet (no neighbour search, no share/trade/steal)
+    tribeOpinions: true, // false = strangers are judged on trust alone (the S4 world)
   },
 
   // Terrain generation (becomes New World setup sliders in S8).
@@ -104,6 +105,11 @@ export const config = {
     betrayalMultiplier: 3, // stealing from someone who LIKED you: 3x the drop (-0.9)
     guardWeight: 0.5,     // steal chance drops by this x victim's distrust (known thief at -1: -50%)
     reputationWeight: 0.5, // how much reputation (-1..+1) shifts warmth: 0.5 -> a cheater cuts my trust by up to 0.5
+  },
+
+  // Minds (S5): opinions, gossip, learned trust, culture.
+  minds: {
+    tribeOpinionRate: 0.3, // a member's deed moves my opinion of their WHOLE tribe by this x the personal change
   },
 
   reproduction: {

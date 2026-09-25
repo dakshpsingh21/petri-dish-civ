@@ -13,9 +13,10 @@ import { inheritGenes, copyCulture } from './genes.js';
 // - lastBirth: age when it last had a child (-Infinity = never), for the birth cooldown.
 // - diedOf: null while alive, then 'starved' or 'oldAge' (the History Book will want this).
 // - memory: Map otherId -> reputation, an LRU cache (see minds.js). Starts EMPTY, never inherited.
+// - tribeOpinions: Map tribeId -> opinion of that whole tribe (minds.js). Also starts empty.
 // (Typed arrays only if profiling says so.)
 export function createAgent({ id, x, y, grain, fruit, genes, culture, maxAge, tribeId, parentId = 0 }) {
-  return { id, parentId, tribeId, x, y, grain, fruit, age: 0, maxAge, lastBirth: -Infinity, alive: true, diedOf: null, genes, culture, memory: new Map() };
+  return { id, parentId, tribeId, x, y, grain, fruit, age: 0, maxAge, lastBirth: -Infinity, alive: true, diedOf: null, genes, culture, memory: new Map(), tribeOpinions: new Map() };
 }
 
 // Lifespan = base +/- up to `spread`, uniform. Always rolled (even with aging off) so

@@ -55,7 +55,7 @@
 - [x] 3. Apply outcomes: share = give some surplus; trade = swap surplus for need (**both** end up better off); steal = take from their bigger store (success depends on aggression).
 - [x] 4. Memory: `Map` used as an LRU capped at `memorySize`. Reputation updates after every interaction; betrayal (stealing from someone who trusted you) = big penalty.
 - [x] 5. Tribe relation tallies (trades / shares / steals / betrayals per tribe pair per year).
-- [ ] 6. `fx.js` + **event flashes**: steal spark, trade pulse, death ripple. Sampled, capped, never uses the RNG.
+- [x] 6. `fx.js` + **event flashes**: steal spark, trade pulse, death ripple. Sampled, capped, never uses the RNG.
 
 **Files:** `rules.js`, `agent.js`, `sim.js`, `tribes.js`, `fx.js`, `render.js`, `tests.html`
 **Done when:** you can *see* trades and steals · different trait mixes lead to visibly different outcomes · baseline timings recorded.
@@ -63,7 +63,7 @@
 
 ## S5: Minds that spread 🧠
 **Goal:** opinions, lessons and culture spread between agents → grudges and traditions emerge.
-- [ ] 1. `minds.js` + **tribe opinions**: each interaction nudges the target's opinion of the actor's *tribe*; `decide()` falls back on it for strangers.
+- [x] 1. `minds.js` + **tribe opinions**: each interaction nudges the target's opinion of the actor's *tribe*; `decide()` falls back on it for strangers.
 - [ ] 2. **Gossip:** tribe-mates who meet blend their tribe opinions (rate knob), so one betrayal becomes a tribal grudge.
 - [ ] 3. **Learned trust:** an experience layer (betrayed → trust ↓, good trades → trust ↑). Children don't inherit it.
 - [ ] 4. **Culture + elders:** old, well-fed agents pull nearby tribe-mates' culture toward their own effective traits. Staggered: only 1/N of agents each tick.

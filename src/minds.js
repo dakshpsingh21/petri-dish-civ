@@ -1,4 +1,4 @@
-// minds.js: what agents remember about each other (S4), later tribe opinions + gossip (S5).
+// minds.js: what agents remember about each other (S4), tribe opinions (S5), gossip next.
 // Sim code: no DOM, no RNG needed here (nothing in it is random).
 //
 // agent.memory is a Map: otherAgentId -> reputation (-1 = cheated me .. +1 = always fair).
@@ -33,6 +33,13 @@ export function remember(agent, otherId, delta, config) {
   }
 }
 
+// `target` feels `delta` about `actor`: a full-size change to their personal reputation,
+// and a smaller one (x tribeOpinionRate) to their opinion of the actor's whole TRIBE.
+function feel(target, actor, delta, config) {
+  remember(target, actor.id, delta, config);
+  if (config.features.tribeOpinions) nudgeTribe(target, actor.tribeId, delta * config.minds.tribeOpinionRate);
+}
+
 // After an interaction, the one it was DONE TO updates their opinion of the actor.
 // (Trade helps both, so both remember it.) A theft, even a failed attempt, hurts; stealing
 // from someone who liked you (reputation > 0) is a BETRAYAL and costs `betrayalMultiplier` x.
@@ -40,14 +47,37 @@ export function remember(agent, otherId, delta, config) {
 export function updateReputation(action, agent, other, config) {
   const s = config.society;
   if (action === 'TRADE') {
-    remember(other, agent.id, s.repTrade, config);
-    remember(agent, other.id, s.repTrade, config);
+    feel(other, agent, s.repTrade, config);
+    feel(agent, other, s.repTrade, config);
   } else if (action === 'SHARE') {
-    remember(other, agent.id, s.repShare, config);
+    feel(other, agent, s.repShare, config);
   } else if (action === 'STEAL') {
     const betrayal = (other.memory.get(agent.id) ?? 0) > 0;   // peek: no LRU touch needed
-    remember(other, agent.id, -s.repSteal * (betrayal ? s.betrayalMultiplier : 1), config);
+    feel(other, agent, -s.repSteal * (betrayal ? s.betrayalMultiplier : 1), config);
     return betrayal;
   }
   return false;
+}
+
+// ---------- tribe opinions (S5) ----------
+// agent.tribeOpinions: Map tribeId -> opinion (-1..+1) of a WHOLE tribe, built from what its
+// members did to me. It lets me judge a stranger by their tribe ("the Varu are thieves").
+// No LRU: an agent only ever meets a handful of tribes, so the Map stays tiny.
+
+const clampRep = (v) => Math.max(-1, Math.min(1, v));
+
+export function tribeOpinion(agent, tribeId) {
+  return agent.tribeOpinions.get(tribeId) ?? 0;
+}
+
+function nudgeTribe(agent, tribeId, delta) {
+  agent.tribeOpinions.set(tribeId, clampRep(tribeOpinion(agent, tribeId) + delta));
+}
+
+// What `agent` knows about `other`, most specific first:
+// personal reputation -> opinion of their tribe -> 0 (then decide() runs on trust alone).
+// touch = true counts as 'thinking about them' (LRU). The victim's guard only peeks (false).
+export function opinionOf(agent, other, config, touch = true) {
+  if (agent.memory.has(other.id)) return touch ? recall(agent, other.id) : agent.memory.get(other.id);
+  return config.features.tribeOpinions ? tribeOpinion(agent, other.tribeId) : 0;
 }

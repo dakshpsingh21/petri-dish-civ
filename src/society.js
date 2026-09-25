@@ -3,7 +3,7 @@
 
 import { findNeighborsNaive } from './neighbors.js';
 import { decide, apply } from './rules.js';
-import { recall, updateReputation } from './minds.js';
+import { opinionOf, updateReputation } from './minds.js';
 import { tallyRelation } from './tribes.js';
 import { pushFx, FX_TRADE, FX_SHARE, FX_STEAL } from './fx.js';
 
@@ -23,10 +23,11 @@ export function meet(state, config) {
     pairs += nearby.length;
 
     const other = nearby[state.rng.int(nearby.length)];
-    const action = decide(agent, other, { reputation: recall(agent, other.id), config });
+    const action = decide(agent, other, { reputation: opinionOf(agent, other, config), config });
     if (action === 'IGNORE') continue;
-    // Victim's distrust of the actor (peek with get(): being robbed isn't 'thinking about' them).
-    const guard = Math.max(0, -(other.memory.get(agent.id) ?? 0));
+    // Victim's distrust of the actor: personal, else of their tribe (so hit-and-run gets harder).
+    // Peek only (touch = false): being robbed isn't 'thinking about' them.
+    const guard = Math.max(0, -opinionOf(other, agent, config, false));
     const moved = apply(action, agent, other, state.rng, config, guard);
     const field = action === 'TRADE' ? 'trades' : action === 'SHARE' ? 'shares'
       : moved > 0 ? 'steals' : 'failedSteals';
