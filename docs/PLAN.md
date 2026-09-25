@@ -50,7 +50,7 @@
 
 ## S4: Society 🤝
 **Goal:** neighbors share, trade or steal, and remember who did what.
-- [ ] 1. Naive neighbor finding (O(n²), **on purpose**). Record a baseline ms/tick at 500 / 1k / 2k / 5k agents in HANDOVER.
+- [x] 1. Naive neighbor finding (O(n²), **on purpose**). Record a baseline ms/tick at 500 / 1k / 2k / 5k agents in HANDOVER.
 - [ ] 2. `rules.js`: `decide(agent, other, context)` → `'SHARE' | 'TRADE' | 'STEAL'` as a **pure function**, using need (trade when I lack what you have), effective traits and reputation. Add `console.assert` tests.
 - [ ] 3. Apply outcomes: share = give some surplus; trade = swap surplus for need (**both** end up better off); steal = take from their bigger store (success depends on aggression).
 - [ ] 4. Memory: `Map` used as an LRU capped at `memorySize`. Reputation updates after every interaction; betrayal (stealing from someone who trusted you) = big penalty.

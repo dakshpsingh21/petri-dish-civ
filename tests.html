@@ -27,6 +27,7 @@
     import { metabolize } from './src/agent.js';
     import { createBus } from './src/events.js';
     import { findNeighborsNaive } from './src/neighbors.js';
+    import { decide } from './src/rules.js';
 
     // The naive O(n^2) neighbour search makes the long tests below take MINUTES (~25k ticks).
     // They test other mechanics, so they run with it off. The society tests switch it on
@@ -235,6 +236,41 @@
       assert(off.key === on.key, 'history changed');
       assert(on.contacts.agents > 0, 'nobody ever met anyone');
       assert(on.contacts.pairs % 2 === 0, 'pairs are counted from both sides, so must be even');
+    });
+
+    // ---------- rules.js decide() ----------
+    // Hand-made agents: only the fields decide() reads. Traits default to a neutral 0.5.
+    const mk = (grain, fruit, traits = {}) => ({ grain, fruit, culture: neutralCulture(),
+      genes: { greed: 0.5, trust: 0.5, aggression: 0.5, memory: 0.5, ...traits } });
+    const meeting = (reputation = 0) => ({ reputation, config });
+    test('decide: complementary strangers trade', () => {
+      assert(decide(mk(18, 2), mk(2, 18), meeting()) === 'TRADE', 'expected TRADE');
+    });
+    test('decide: hungry, aggressive, distrustful agent steals from a rich one', () => {
+      assert(decide(mk(2, 2, { aggression: 1, trust: 0 }), mk(18, 18), meeting()) === 'STEAL', 'expected STEAL');
+    });
+    test('decide: same hungry agent but trusting + peaceful does NOT steal', () => {
+      assert(decide(mk(2, 2, { aggression: 0, trust: 1 }), mk(18, 18), meeting()) === 'IGNORE', 'expected IGNORE');
+    });
+    test('decide: rich, generous, trusting agent shares with a starving one', () => {
+      assert(decide(mk(18, 18, { greed: 0, trust: 1 }), mk(2, 2), meeting()) === 'SHARE', 'expected SHARE');
+    });
+    test('decide: greedy rich agent does NOT share', () => {
+      assert(decide(mk(18, 18, { greed: 1, trust: 1 }), mk(2, 2), meeting()) !== 'SHARE', 'greedy agent shared');
+    });
+    test('decide: two full agents ignore each other', () => {
+      assert(decide(mk(20, 20), mk(20, 20), meeting()) === 'IGNORE', 'expected IGNORE');
+    });
+    test('decide: bad reputation turns a trade into a theft', () => {
+      const me = mk(18, 2, { aggression: 0.8 }), them = mk(2, 18);
+      assert(decide(me, them, meeting(0)) === 'TRADE', 'stranger: expected TRADE');
+      assert(decide(me, them, meeting(-1)) === 'STEAL', 'known cheater: expected STEAL');
+    });
+    test('decide: pure (same inputs -> same answer, inputs untouched)', () => {
+      const a = mk(5, 15, { greed: 0.3 }), b = mk(15, 5);
+      const before = JSON.stringify([a, b]);
+      assert(decide(a, b, meeting(0.2)) === decide(a, b, meeting(0.2)), 'answers differ');
+      assert(JSON.stringify([a, b]) === before, 'decide() changed its inputs');
     });
 
     // ---------- world.js terrain ----------

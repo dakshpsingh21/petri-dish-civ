@@ -87,6 +87,8 @@ export const config = {
   // Society (S4): agents meet neighbours, then share, trade or steal.
   society: {
     radius: 1,            // how far away (in cells) counts as "next to me". 1 = my cell + the 8 around it
+    minScore: 0.1,        // an action's score (0..1) must beat this, else IGNORE (well-fed strangers just pass by)
+    reputationWeight: 0.5, // how much reputation (-1..+1) shifts warmth: 0.5 -> a cheater cuts my trust by up to 0.5
   },
 
   reproduction: {

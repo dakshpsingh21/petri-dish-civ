@@ -1,0 +1,6 @@
+{
+  "name": "petri-dish-civ",
+  "private": true,
+  "type": "module",
+  "description": "No dependencies. This file only tells Node (tools/bench.mjs) that .js files are ES modules."
+}

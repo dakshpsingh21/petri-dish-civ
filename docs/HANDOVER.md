@@ -30,6 +30,18 @@ Daksh committed steps 1-5; **step 6 (visuals) + S3 docs still need committing** 
   - Tribes, no splits: no extinctions in 20 years; sizes diverge by geography/luck ('petri': Mardorzen 265 -> 458, Thitodor 71 -> 9).
   - Splits at 0.35: first ~year 5-7, then ~10-15/year; self-limiting (mean distance from own founder holds ~0.19 for 60 years); ~90 tribes alive at year 50 but only ~15 with 20+ members.
   - ~0.55-0.7 ms/tick at ~1,200-1,400 agents.
+- **S4 baseline: naive O(n^2) neighbour search** (`tools/bench.mjs`, seed 'daksh', radius 1, births/aging/metabolism off so n stays fixed; 20 warm-up + 100 timed ticks):
+
+  | agents | Windows node: OFF | ON | neighbour cost | Linux VM node: cost |
+  |---|---|---|---|---|
+  | 500 | 0.38 | 1.10 | 0.72 ms | ~0.8-1.0 ms |
+  | 1,000 | 0.41 | 3.68 | 3.27 ms | ~3.7 ms |
+  | 2,000 | 0.63 | 12.65 | 12.02 ms | ~17 ms |
+  | 5,000 | 1.19 | 109.99 | **108.8 ms** | ~136 ms |
+
+  2x agents -> ~4x cost (n^2). At 5k the search alone is ~14x the 8 ms sim budget -> S12 target.
+  Browser (overlay, normal run ~1.2-1.4k agents, DevTools open): **~14.5 ms/tick**. Fine at 20 TPS for now.
+  At year 1, ~38% of agents have a neighbour (492 of 1,292; avg 0.48 neighbours each) -> meetings are fairly rare.
 - Headless test pattern: `node --input-type=module -e "const b='<repo>/src/'; const {createSim,step}=await import(b+'sim.js'); ..."`. tests.html can also be run in node by extracting its module script and stubbing `document`.
 
 ## Next step
