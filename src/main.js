@@ -12,7 +12,9 @@ const canvas = document.getElementById('world');
 // Subscribe BEFORE creating the sim, so we also hear the tick-0 "tribe:founded" events.
 // For now events just go to the console; the History Book (S11) will listen here too.
 const bus = createBus();
-bus.on('tribe:founded', e => console.log(`[tick ${e.tick}] The ${e.name} are founded.`));
+bus.on('tribe:founded', e => console.log(e.parentName
+  ? `[tick ${e.tick}] The ${e.name} split off from the ${e.parentName}.`
+  : `[tick ${e.tick}] The ${e.name} are founded.`));
 bus.on('tribe:extinct', e => console.log(`[tick ${e.tick}] The ${e.name} have died out.`));
 
 const state = createSim(config, WORLD_WIDTH, WORLD_HEIGHT, bus);

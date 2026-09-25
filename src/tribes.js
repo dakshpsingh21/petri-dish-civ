@@ -43,7 +43,8 @@ export function foundTribe(tribes, founderGenes, tick, parentTribeId, rng, bus) 
     extinctTick: null,                   // stays in the Map after death: the History Book needs names
   };
   tribes.byId.set(id, tribe);
-  bus.emit('tribe:founded', { tick, tribeId: id, name: tribe.name, parentTribeId });
+  const parentName = parentTribeId ? tribes.byId.get(parentTribeId).name : null;
+  bus.emit('tribe:founded', { tick, tribeId: id, name: tribe.name, parentTribeId, parentName });
   return tribe;
 }
 

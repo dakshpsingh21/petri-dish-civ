@@ -5,7 +5,7 @@
 import { createRng, hashString } from './rng.js';
 import { createWorld, regrow, isPassable, yearFraction, seasonName, seasonFactor } from './world.js';
 import { createAgent, rollLifespan, growOlder, moveTowardFood, eat, metabolize, tryReproduce } from './agent.js';
-import { randomGenes, varyGenes, neutralCulture } from './genes.js';
+import { randomGenes, varyGenes, neutralCulture, geneDistance } from './genes.js';
 import { createBus } from './events.js';
 import { createTribes, foundTribe, updatePopulations } from './tribes.js';
 
@@ -116,11 +116,21 @@ function reproduce(state, config, living) {
     const child = tryReproduce(parent, state.nextAgentId, state.world, state.rng, config);
     if (child) {
       state.nextAgentId++;
+      if (config.features.tribeSplits) checkSplit(state, config, child);
       state.agents.push(child);
       state.births++;
       living++;
     }
   }
+}
+
+// A child born too different from its tribe's founder starts a NEW tribe, with its own
+// genes as the new founder genes. Checked only at birth: genes never change after that.
+function checkSplit(state, config, child) {
+  const tribe = state.tribes.byId.get(child.tribeId);
+  if (geneDistance(child.genes, tribe.founderGenes) <= config.tribes.splitThreshold) return;
+  const newTribe = foundTribe(state.tribes, child.genes, state.tick, tribe.id, state.rng, state.bus);
+  child.tribeId = newTribe.id;
 }
 
 // Work out where we are in the year. Stored on state so the overlay (and later the

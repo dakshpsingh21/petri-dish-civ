@@ -23,7 +23,7 @@
     import { createSim, step } from './src/sim.js';
     import { config, WORLD_WIDTH, WORLD_HEIGHT } from './src/config.js';
     import { PASSABLE } from './src/world.js';
-    import { GENE_NAMES, inheritGenes, copyCulture, neutralCulture } from './src/genes.js';
+    import { GENE_NAMES, inheritGenes, copyCulture, neutralCulture, geneDistance } from './src/genes.js';
     import { metabolize } from './src/agent.js';
     import { createBus } from './src/events.js';
 
@@ -181,6 +181,23 @@
       step(s, config);
       step(s, config);
       assert(extinct.length === 1 && extinct[0] === 1, `extinct events: [${extinct}]`);
+    });
+    test('splits: new tribes appear, and nobody is ever too far from their own founder (6000 ticks)', () => {
+      const s = createSim(config, WORLD_WIDTH, WORLD_HEIGHT);
+      for (let t = 0; t < 6000; t++) step(s, config);
+      const splits = [...s.tribes.byId.values()].filter(t => t.parentTribeId > 0);
+      assert(splits.length > 0, 'no splits in 10 years');
+      for (const a of s.agents) {
+        const d = geneDistance(a.genes, s.tribes.byId.get(a.tribeId).founderGenes);
+        assert(d <= config.tribes.splitThreshold, `agent ${a.id} is ${d.toFixed(3)} from its founder`);
+      }
+    });
+    test('splits: flag off -> only the starting tribes ever exist', () => {
+      const c = structuredClone(config);
+      c.features.tribeSplits = false;
+      const s = createSim(c, WORLD_WIDTH, WORLD_HEIGHT);
+      for (let t = 0; t < 6000; t++) step(s, c);
+      assert(s.tribes.byId.size === c.tribes.startCount, `${s.tribes.byId.size} tribes`);
     });
     test('tribes: same seed -> same names', () => {
       const names = () => [...createSim(config, WORLD_WIDTH, WORLD_HEIGHT).tribes.byId.values()].map(t => t.name).join(',');

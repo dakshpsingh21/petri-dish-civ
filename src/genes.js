@@ -34,6 +34,14 @@ export function inheritGenes(parentGenes, rng, config) {
   return varyGenes(parentGenes, config.features.mutation ? config.mutationRate : 0, rng);
 }
 
+// How different two sets of genes are: straight-line (Euclidean) distance across all
+// genes, i.e. Pythagoras in 4D. 0 = identical; max is 2 (sqrt of 4 genes x 1^2).
+export function geneDistance(a, b) {
+  let sum = 0;
+  for (const name of GENE_NAMES) sum += (a[name] - b[name]) ** 2;
+  return Math.sqrt(sum);
+}
+
 // Culture = offsets added on top of genes (effective trait = clamp01(gene + culture + ...)).
 // Founders start neutral. Elders will pull it around in S5.
 export function neutralCulture() {

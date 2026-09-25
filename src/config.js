@@ -18,6 +18,7 @@ export const config = {
     reproduction: true, // false = no births (the S1-S2 world: one generation, then empty)
     mutation: true,     // false = children are exact gene clones of their parent
     aging: true,        // false = nobody dies of old age, metabolism stays flat
+    tribeSplits: true,  // false = the starting tribes are the only tribes ever
   },
 
   // Terrain generation (becomes New World setup sliders in S8).
@@ -74,6 +75,11 @@ export const config = {
   tribes: {
     startCount: 8,        // starting tribes; each founder joins the tribe whose home is nearest
     founderSpread: 0.15,  // how far a founder's genes can stray from its tribe's base genes
+    // Child's gene distance from its tribe's founder genes above this -> it founds a new tribe.
+    // 0.35: first splits ~year 5-7, then ~10-15/year; most die young, ~15 tribes of 20+ by year 40.
+    // Self-limiting: every split resets the reference for that line (mean distance holds ~0.19).
+    // Must stay above the max founder spread (sqrt(4) x 0.15 = 0.3) or founders would count as splits.
+    splitThreshold: 0.35,
   },
 
   reproduction: {
